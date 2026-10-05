@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: "Segoe UI", system-ui, sans-serif;
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+}
+
+:root {
+  color-scheme: light;
+  font-family: var(--font-sans);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --canvas: #f5f6f8;
+  --surface: #ffffff;
+  --foreground: #202934;
+  --muted: #657080;
+  --line: #e1e5eb;
+  --accent: #316556;
+  --accent-soft: #e7f1ed;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --canvas: #151b22;
+    --surface: #1b232d;
+    --foreground: #e8edf3;
+    --muted: #a1adbb;
+    --line: #303a46;
+    --accent: #a0d7c4;
+    --accent-soft: #243c35;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas: #151b22;
+  --surface: #1b232d;
+  --foreground: #e8edf3;
+  --muted: #a1adbb;
+  --line: #303a46;
+  --accent: #a0d7c4;
+  --accent-soft: #243c35;
+}
+
+body {
+  margin: 0;
+  min-width: 640px;
+  background: var(--canvas);
+  color: var(--foreground);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
