@@ -1,53 +1,72 @@
 # CHARLIE OS
 
-A local-first personal workspace for tasks, projects, and time. `PROJECT_SPEC.md` is the product source of truth; `AGENTS.md` contains contributor guidelines.
+A local-first personal workspace for tasks, projects, and time. `PROJECT_SPEC.md` defines the product; `AGENTS.md` contains contributor guidelines.
 
-This foundation includes a Tauri 2 desktop window and a React/TypeScript shell built with Vite and Tailwind CSS. Today is selected; the remaining navigation sections are explicitly unavailable placeholders. Persistence, planning, task workflows, integrations, and AI are not implemented in this iteration.
+Milestone 1 implements the first desktop vertical slice: create/edit a task, persist it in SQLite, recommend what to do next, start a timer, stop or complete the task, and recalculate the recommendation. Today, Tasks, and basic Projects are functional. Inbox, Calendar, and Settings remain unavailable. No AI, OAuth, or external integrations are connected.
 
 ## Development
 
 Use Node.js 22.18+ (or a supported newer LTS), pnpm 11.19.0, stable Rust with the `x86_64-pc-windows-msvc` host, Microsoft C++ Build Tools, a Windows SDK, and WebView2.
 
 ```powershell
-cd C:\dev\charlie-os
 pnpm install --frozen-lockfile
 pnpm tauri dev
 ```
 
-Tauri starts Vite on `http://localhost:1420`, compiles the Rust backend, and opens the native CHARLIE OS window. Close the window and stop the terminal with Ctrl+C when finished. Port 1420 must be available. Restart your terminal if it cannot find Cargo after installing Rust.
+Tauri starts Vite at `http://localhost:1420` and opens the native window. Task operations require the desktop backend; the browser alone has no alternate task store. Port 1420 must be available. Close the window and stop the terminal with Ctrl+C when finished.
 
-## Validation commands
+## Validation
 
-- `pnpm typecheck`: check the application and Vite configuration.
-- `pnpm build`: type-check and generate the frontend in `dist/`.
-- `pnpm lint`: check TypeScript, React, and configuration files.
-- `pnpm format:check`: check frontend/documentation formatting.
-- `pnpm format`: format files, preserving the supplied specification and guide.
-- `cargo fmt --manifest-path src-tauri/Cargo.toml -- --check`: check Rust formatting.
-- `cargo check --locked --manifest-path src-tauri/Cargo.toml`: check the native backend.
-- `cargo clippy --locked --manifest-path src-tauri/Cargo.toml -- -D warnings`: check Rust linting.
-- `pnpm tauri build`: build the desktop application and installer packages; packaging is separate from the development validation for this foundation.
+```powershell
+pnpm build
+pnpm lint
+pnpm format:check
+pnpm test
+cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+cargo test --locked --manifest-path src-tauri/Cargo.toml
+cargo check --locked --manifest-path src-tauri/Cargo.toml
+cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+pnpm tauri dev
+```
 
-No test runner has been added yet because there is no domain or persistence behavior to test. Add meaningful domain tests with the first functional slice.
+`pnpm typecheck` can be run separately. `pnpm tauri build` packages the app. `pnpm format` formats frontend files and documentation; use `cargo fmt` for Rust. Vitest covers deterministic planning, risk, and Santiago dates; Rust integration tests use temporary SQLite databases for migrations, persistence, state transitions, and timer invariants.
 
-## Structure and boundaries
+## Data and time
 
-- `src/app/`: application composition, shell, and navigation.
-- `src/components/ui/`: shared presentation components.
-- `src/features/`: feature views, starting with Today.
-- `src/domain/`: reserved for pure models, planning, priority, and date logic; no React or Tauri dependencies.
-- `src/application/`: reserved for use cases and repository/provider interfaces.
-- `src/adapters/`: reserved for concrete bridges such as Tauri commands.
-- `src/styles/`: Tailwind and semantic color tokens. System light/dark mode works by default; a future preference can set `data-theme="light"` or `data-theme="dark"` on the document root.
-- `public/`: locally bundled static assets, including the CHARLIE mark.
-- `src-tauri/`: Rust runtime, window configuration, capabilities, and application icons.
+The database is `charlie.sqlite3` under Tauri's application local-data directory (`%LOCALAPPDATA%\dev.charlie.os` on Windows). SQLite is the authoritative store. There is no localStorage fallback or automatic seed in production. Numbered migrations run transactionally on startup and never reset existing data. Task work totals are derived from closed time entries.
 
-SQLite will live behind Rust repositories and versioned migrations in a later iteration. Zustand can be added when shared frontend state is needed. Neither is required for this static shell.
+Date-only deadlines keep their `YYYY-MM-DD` value and expire at the start of the next Santiago day. Timed deadlines and lifecycle timestamps are absolute UTC RFC3339 values. The UI displays and interprets times in `America/Santiago`, including daylight-saving transitions. Ambiguous/nonexistent local time inputs are rejected.
 
-## Dependencies
+An open timer continues across app restarts, including time spent with the app closed. Stop records the elapsed milliseconds and returns the task to `todo`; Complete records elapsed time and marks it `done`. Stop or complete the current task before starting another. A backward clock change produces an error when closing a timer rather than recording negative work.
 
-Direct runtime dependencies: `react` and `react-dom` render the application; Rust `tauri` provides the native runtime. Rust `tauri-build` is the build dependency for configuration and resources.
+## Isolated development data
 
-Direct frontend development dependencies: `typescript`, `@types/react`, `@types/react-dom`, and `@types/node` provide type checking; `vite` and `@vitejs/plugin-react` provide development serving and bundling; `@tauri-apps/cli` runs desktop development/build commands; `tailwindcss` and `@tailwindcss/vite` compile styles; `eslint`, `@eslint/js`, `typescript-eslint`, `eslint-plugin-react-hooks`, `eslint-plugin-react-refresh`, and `globals` enforce lint rules; `prettier` formats source files. Lockfiles record all resolved transitive dependencies.
+Debug builds support an optional database override and seed:
 
-The starter greeting command, framework logos, opener plugin, unused Tauri JavaScript API, and unused direct serialization dependencies have been removed.
+```powershell
+$env:CHARLIE_DB_PATH = 'C:\dev\charlie-os\.validation\demo.sqlite3'
+$env:CHARLIE_SEED = '1'
+pnpm tauri dev
+```
+
+The seed adds one fictitious task only when the task table is empty. Both environment options are ignored in release builds. Omit `CHARLIE_SEED` for a blank database. Never commit personal databases, credentials, `.env` files, or validation artifacts.
+
+## Boundaries
+
+- `src/domain/`: models, clock/date calculations, pure priority and planning functions; no React, Tauri, or database imports.
+- `src/application/`: repository interface and frontend use cases.
+- `src/adapters/`: typed Tauri command/DTO bridge. Keep its contract aligned with Rust `commands.rs` and `domain.rs`.
+- `src/app/`: shell, composition, navigation, and transient state projected from backend snapshots.
+- `src/features/`: Today, Tasks, and Projects views.
+- `src/styles/`: semantic tokens and Tailwind styles; system light/dark mode supported.
+- `src-tauri/src/domain.rs`: DTOs, validation, injectable backend clock, and elapsed-time rules.
+- `src-tauri/src/application.rs`: use cases, identity creation, clock injection.
+- `src-tauri/src/repository.rs`: SQLite queries and atomic persistence transitions.
+- `src-tauri/src/database.rs`, `src-tauri/migrations/`: connection setup and immutable versioned migrations.
+- `src-tauri/tests/`: persistence and migration integration tests.
+
+[Milestone 1 decisions and validation](docs/MILESTONE_1.md) describe the schema, heuristic, limits, and desktop smoke test.
+
+## Added dependencies
+
+`@tauri-apps/api` supplies the IPC bridge. `@js-temporal/polyfill` provides timezone-aware calendar-date and local-time conversion, including Chilean DST. `vitest` runs frontend domain tests. Rust adds bundled `rusqlite` for offline SQLite, `serde` for typed DTO serialization, `chrono` for timestamps and calendar validation, and `uuid` for stable identities. `tempfile` and `serde_json` support integration tests. React state is sufficient for this slice; no global state library is required.
