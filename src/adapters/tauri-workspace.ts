@@ -1,6 +1,13 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import type { WorkspaceRepository } from "../application/workspace-service";
-import type { ProjectInput, TaskInput, Workspace } from "../domain/models";
+import type {
+  AvailabilityInput,
+  EventInput,
+  ProjectInput,
+  ScheduleInput,
+  TaskInput,
+  Workspace,
+} from "../domain/models";
 
 // Mirrors commands.rs. Keep all command names/DTOs at this adapter boundary.
 interface Commands {
@@ -13,6 +20,11 @@ interface Commands {
   stop_task: { id: string };
   complete_task: { id: string };
   set_task_dependencies: { id: string; prerequisiteIds: string[] };
+  save_event: { id: string | null; input: EventInput };
+  delete_event: { id: string };
+  replace_availability: { input: AvailabilityInput[] };
+  replace_schedule: { input: ScheduleInput };
+  set_block_locked: { id: string; locked: boolean };
 }
 function command<K extends keyof Commands>(name: K, args: Commands[K]): Promise<Workspace> {
   if (!isTauri())
@@ -23,6 +35,11 @@ function command<K extends keyof Commands>(name: K, args: Commands[K]): Promise<
 }
 
 export const tauriWorkspace: WorkspaceRepository = {
+  saveEvent: (input, id) => command("save_event", { input, id: id ?? null }),
+  deleteEvent: (id) => command("delete_event", { id }),
+  replaceAvailability: (input) => command("replace_availability", { input }),
+  replaceSchedule: (input) => command("replace_schedule", { input }),
+  setBlockLocked: (id, locked) => command("set_block_locked", { id, locked }),
   read: () => command("read_workspace", undefined),
   createTask: (input) => command("create_task", { input }),
   updateTask: (id, input) => command("update_task", { id, input }),

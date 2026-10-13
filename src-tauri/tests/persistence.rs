@@ -37,6 +37,8 @@ fn input(title: &str) -> TaskInput {
         priority: None,
         deadline: None,
         estimated_minutes: Some(60),
+        splittable: true,
+        minimum_useful_block_minutes: 25,
     }
 }
 fn create(service: &mut TaskService<FixedClock>, title: &str) -> String {
@@ -120,7 +122,7 @@ fn migrations_are_idempotent_and_upgrade_preserves_existing_data() {
             .query_row("SELECT COUNT(*) FROM schema_migrations", [], |r| r
                 .get::<_, i64>(0))
             .unwrap(),
-        2
+        database::MIGRATIONS.len() as i64
     );
     assert_eq!(
         connection
@@ -171,7 +173,7 @@ fn newer_or_modified_migration_history_is_rejected_without_changing_tasks() {
             .query_row("SELECT COUNT(*) FROM schema_migrations", [], |r| r
                 .get::<_, i64>(0))
             .unwrap(),
-        2
+        database::MIGRATIONS.len() as i64
     );
 }
 

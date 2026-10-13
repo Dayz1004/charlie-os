@@ -1,3 +1,4 @@
+use crate::calendar::{AvailabilityInput, EventInput, ScheduleInput};
 use crate::{domain::*, repository::SqliteRepository};
 use uuid::Uuid;
 
@@ -12,6 +13,33 @@ impl<C: Clock> TaskService<C> {
     }
     pub fn snapshot(&mut self) -> Result<Snapshot> {
         self.repository.snapshot()
+    }
+    pub fn save_event(&mut self, id: Option<&str>, mut input: EventInput) -> Result<Snapshot> {
+        input.validate()?;
+        self.repository.save_event(
+            id.unwrap_or(&Uuid::new_v4().to_string()),
+            &input,
+            &timestamp(self.clock.now()),
+            id.is_none(),
+        )?;
+        self.snapshot()
+    }
+    pub fn delete_event(&mut self, id: &str) -> Result<Snapshot> {
+        self.repository.delete_event(id)?;
+        self.snapshot()
+    }
+    pub fn replace_availability(&mut self, input: &[AvailabilityInput]) -> Result<Snapshot> {
+        self.repository.replace_availability(input)?;
+        self.snapshot()
+    }
+    pub fn replace_schedule(&mut self, input: &ScheduleInput) -> Result<Snapshot> {
+        self.repository.replace_schedule(input, self.clock.now())?;
+        self.snapshot()
+    }
+    pub fn set_block_locked(&mut self, id: &str, locked: bool) -> Result<Snapshot> {
+        self.repository
+            .set_block_locked(id, locked, self.clock.now())?;
+        self.snapshot()
     }
 
     pub fn create_task(&mut self, mut input: TaskInput) -> Result<Snapshot> {

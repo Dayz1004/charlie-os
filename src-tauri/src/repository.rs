@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 
 pub struct SqliteRepository {
-    connection: Connection,
+    pub(crate) connection: Connection,
 }
 
 fn task_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Task> {
@@ -27,10 +27,12 @@ fn task_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Task> {
         updated_at: row.get(10)?,
         completed_at: row.get(11)?,
         actual_minutes: row.get(12)?,
+        splittable: row.get(13)?,
+        minimum_useful_block_minutes: row.get(14)?,
     })
 }
 
-fn require_task(tx: &Transaction<'_>, id: &str) -> Result<TaskStatus> {
+pub(crate) fn require_task(tx: &Transaction<'_>, id: &str) -> Result<TaskStatus> {
     tx.query_row("SELECT status FROM tasks WHERE id = ?1", [id], |row| {
         row.get(0)
     })
@@ -38,7 +40,7 @@ fn require_task(tx: &Transaction<'_>, id: &str) -> Result<TaskStatus> {
     .ok_or_else(|| AppError::validation("Task does not exist."))
 }
 
-fn require_project(connection: &Connection, id: Option<&str>) -> Result<()> {
+pub(crate) fn require_project(connection: &Connection, id: Option<&str>) -> Result<()> {
     if let Some(id) = id {
         if !connection.query_row(
             "SELECT EXISTS(SELECT 1 FROM projects WHERE id = ?1)",
@@ -79,7 +81,7 @@ impl SqliteRepository {
         let projects = tx.prepare("SELECT id, name, description, status, created_at, updated_at, archived_at FROM projects ORDER BY created_at, id")?
             .query_map([], |row| Ok(Project { id: row.get(0)?, name: row.get(1)?, description: row.get(2)?, status: row.get(3)?, created_at: row.get(4)?, updated_at: row.get(5)?, archived_at: row.get(6)? }))?
             .collect::<std::result::Result<Vec<_>, _>>()?;
-        let tasks = tx.prepare("SELECT t.id, t.title, t.description, t.project_id, t.status, t.priority, t.deadline_kind, t.deadline_value, t.estimated_minutes, t.created_at, t.updated_at, t.completed_at, COALESCE((SELECT SUM(duration_millis) / 60000.0 FROM time_entries WHERE task_id = t.id), 0.0) FROM tasks t ORDER BY created_at, id")?
+        let tasks = tx.prepare("SELECT t.id, t.title, t.description, t.project_id, t.status, t.priority, t.deadline_kind, t.deadline_value, t.estimated_minutes, t.created_at, t.updated_at, t.completed_at, COALESCE((SELECT SUM(duration_millis) / 60000.0 FROM time_entries WHERE task_id = t.id), 0.0), t.splittable, t.minimum_useful_block_minutes FROM tasks t ORDER BY created_at, id")?
             .query_map([], task_from_row)?.collect::<std::result::Result<Vec<_>, _>>()?;
         let time_entries = tx.prepare("SELECT id, task_id, started_at, ended_at, duration_millis / 60000.0, created_at FROM time_entries ORDER BY started_at, id")?
             .query_map([], |row| Ok(TimeEntry { id: row.get(0)?, task_id: row.get(1)?, started_at: row.get(2)?, ended_at: row.get(3)?, duration_minutes: row.get(4)?, created_at: row.get(5)? }))?
@@ -87,12 +89,18 @@ impl SqliteRepository {
         let dependencies = tx.prepare("SELECT task_id, depends_on_task_id FROM task_dependencies ORDER BY task_id, depends_on_task_id")?
             .query_map([], |row| Ok(TaskDependency { task_id: row.get(0)?, depends_on_task_id: row.get(1)? }))?
             .collect::<std::result::Result<Vec<_>, _>>()?;
+        let calendar = crate::schedule_repository::read_calendar(&tx)?;
         tx.commit()?;
         Ok(Snapshot {
             projects,
             tasks,
             time_entries,
             dependencies,
+            events: calendar.events,
+            availability: calendar.availability,
+            plan_blocks: calendar.blocks,
+            revision: calendar.revision,
+            planning_state: calendar.state,
         })
     }
 
@@ -142,6 +150,10 @@ impl SqliteRepository {
             tx.execute("UPDATE tasks SET title = ?2, description = ?3, project_id = ?4, status = ?5, priority = ?6, deadline_kind = ?7, deadline_value = ?8, estimated_minutes = ?9, updated_at = ?10, completed_at = CASE WHEN ?5 = 'done' THEN completed_at ELSE NULL END WHERE id = ?1",
                 params![id, input.title, input.description, input.project_id, input.status.as_str(), input.priority.map(|p| p.as_str()), kind, value, input.estimated_minutes, now])?;
         }
+        tx.execute(
+            "UPDATE tasks SET splittable = ?2, minimum_useful_block_minutes = ?3 WHERE id = ?1",
+            params![id, input.splittable, input.minimum_useful_block_minutes],
+        )?;
         tx.commit()?;
         Ok(())
     }

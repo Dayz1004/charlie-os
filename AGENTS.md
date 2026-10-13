@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-The verified Milestone 0 foundation is extended by Milestone 1: local tasks/projects, SQLite persistence, deterministic planning, and task time tracking. `PROJECT_SPEC.md` remains the product source of truth; `docs/MILESTONE_1.md` records implementation decisions.
+The verified Milestone 0 foundation is extended by Milestones 1 and 2: local tasks/projects, SQLite persistence, task time tracking, deterministic scheduling, local events, availability, and Today/Week/Month views. `PROJECT_SPEC.md` remains the product source of truth; `docs/MILESTONE_1.md` and `docs/MILESTONE_2.md` record implementation decisions.
 
 - `src/domain/`: pure models, clock/date rules, priority and planning. No React or persistence imports.
 - `src/application/`: use cases and repository interfaces.
@@ -39,6 +39,8 @@ Use two-space indentation for TypeScript/TSX and four spaces for Rust. Use Pasca
 ## Testing Guidelines
 
 Use Vitest and Rust's test framework. Prioritize deterministic planning, priority/risk scoring, deadlines, timezone handling, and duration calculations. Inject a clock or explicit instant into time-sensitive logic. Test blocked-task exclusion, tasks without deadlines, and the single-active-task constraint, including separate SQLite connections. Add migration/persistence integration tests using temporary databases and fictitious fixtures. Verify desktop creation and restart persistence when changing persistence workflows.
+
+Scheduling tests must cover fixed events, availability boundaries, splitting, minimum blocks, no overlap, overload, preserved blocks, and Santiago DST gaps/repeated hours. Replanning replaces only unlocked future work. Use workspace revisions to reject stale schedule writes. Never infer completed work from past proposed blocks or silently alter task estimates/deadlines.
 
 ## Commit & Pull Request Guidelines
 

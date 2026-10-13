@@ -1,6 +1,35 @@
+use crate::calendar::{AvailabilityInput, EventInput, ScheduleInput};
 use crate::{application::TaskService, domain::*};
 use std::sync::Mutex;
 use tauri::State;
+
+#[tauri::command]
+pub fn save_event(
+    state: State<'_, AppState>,
+    id: Option<String>,
+    input: EventInput,
+) -> Result<Snapshot> {
+    service(&state)?.save_event(id.as_deref(), input)
+}
+#[tauri::command]
+pub fn delete_event(state: State<'_, AppState>, id: String) -> Result<Snapshot> {
+    service(&state)?.delete_event(&id)
+}
+#[tauri::command]
+pub fn replace_availability(
+    state: State<'_, AppState>,
+    input: Vec<AvailabilityInput>,
+) -> Result<Snapshot> {
+    service(&state)?.replace_availability(&input)
+}
+#[tauri::command]
+pub fn replace_schedule(state: State<'_, AppState>, input: ScheduleInput) -> Result<Snapshot> {
+    service(&state)?.replace_schedule(&input)
+}
+#[tauri::command]
+pub fn set_block_locked(state: State<'_, AppState>, id: String, locked: bool) -> Result<Snapshot> {
+    service(&state)?.set_block_locked(&id, locked)
+}
 
 pub type AppState = Mutex<TaskService<SystemClock>>;
 

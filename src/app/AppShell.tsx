@@ -22,7 +22,10 @@ export function AppShell({
 
         <nav aria-label="Main navigation" className="space-y-1">
           {primaryNavigation.map((section) =>
-            section.id === "today" || section.id === "tasks" || section.id === "projects" ? (
+            section.id === "today" ||
+            section.id === "tasks" ||
+            section.id === "projects" ||
+            section.id === "calendar" ? (
               <button
                 key={section.id}
                 type="button"
