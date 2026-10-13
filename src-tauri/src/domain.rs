@@ -125,11 +125,27 @@ pub struct TaskInput {
     pub priority: Option<Priority>,
     pub deadline: Option<Deadline>,
     pub estimated_minutes: Option<i64>,
+    #[serde(default = "default_splittable")]
+    pub splittable: bool,
+    #[serde(default = "default_minimum_block")]
+    pub minimum_useful_block_minutes: i64,
+}
+
+fn default_splittable() -> bool {
+    true
+}
+fn default_minimum_block() -> i64 {
+    25
 }
 
 impl TaskInput {
     pub fn validate(&mut self) -> Result<()> {
         self.title = validate_name(&self.title)?;
+        if !(1..=90).contains(&self.minimum_useful_block_minutes) {
+            return Err(AppError::validation(
+                "Minimum useful block must be 1–90 minutes.",
+            ));
+        }
         if self
             .estimated_minutes
             .is_some_and(|n| !(1..=525600).contains(&n))
@@ -167,6 +183,8 @@ pub struct Task {
     pub deadline: Option<Deadline>,
     pub estimated_minutes: Option<i64>,
     pub actual_minutes: f64,
+    pub splittable: bool,
+    pub minimum_useful_block_minutes: i64,
     pub created_at: String,
     pub updated_at: String,
     pub completed_at: Option<String>,
@@ -217,6 +235,11 @@ pub struct Snapshot {
     pub tasks: Vec<Task>,
     pub time_entries: Vec<TimeEntry>,
     pub dependencies: Vec<TaskDependency>,
+    pub events: Vec<crate::calendar::CalendarEvent>,
+    pub availability: Vec<crate::calendar::Availability>,
+    pub plan_blocks: Vec<crate::calendar::PlanBlock>,
+    pub revision: i64,
+    pub planning_state: Option<crate::calendar::PlanningState>,
 }
 
 pub trait Clock: Send {

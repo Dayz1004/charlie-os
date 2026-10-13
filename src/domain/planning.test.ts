@@ -15,6 +15,8 @@ function task(id: string, changes: Partial<Task> = {}): Task {
     priority: null,
     deadline: null,
     estimatedMinutes: 60,
+    splittable: true,
+    minimumUsefulBlockMinutes: 25,
     actualMinutes: 0,
     createdAt: "2026-10-01T00:00:00.000Z",
     updatedAt: "2026-10-01T00:00:00.000Z",
@@ -23,7 +25,18 @@ function task(id: string, changes: Partial<Task> = {}): Task {
   };
 }
 function workspace(tasks: Task[], changes: Partial<Workspace> = {}): Workspace {
-  return { tasks, projects: [], dependencies: [], timeEntries: [], ...changes };
+  return {
+    tasks,
+    projects: [],
+    dependencies: [],
+    timeEntries: [],
+    events: [],
+    availability: [],
+    planBlocks: [],
+    revision: 0,
+    planningState: null,
+    ...changes,
+  };
 }
 function dueIn(minutes: number): Task["deadline"] {
   return { kind: "instant", value: new Date(NOW + minutes * 60000).toISOString() };

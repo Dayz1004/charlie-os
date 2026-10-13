@@ -1,8 +1,10 @@
 pub mod application;
+pub mod calendar;
 mod commands;
 pub mod database;
 pub mod domain;
 pub mod repository;
+mod schedule_repository;
 
 use application::TaskService;
 use domain::SystemClock;
@@ -41,6 +43,8 @@ pub fn run() {
                     priority: None,
                     deadline: None,
                     estimated_minutes: Some(30),
+                    splittable: true,
+                    minimum_useful_block_minutes: 25,
                 })?;
             }
             app.manage(Mutex::new(service));
@@ -56,6 +60,11 @@ pub fn run() {
             commands::stop_task,
             commands::complete_task,
             commands::set_task_dependencies,
+            commands::save_event,
+            commands::delete_event,
+            commands::replace_availability,
+            commands::replace_schedule,
+            commands::set_block_locked,
         ])
         .run(tauri::generate_context!())
         .expect("error while running CHARLIE OS");

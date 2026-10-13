@@ -1,4 +1,13 @@
-import type { ProjectInput, TaskInput, Workspace } from "../domain/models";
+import type {
+  AvailabilityInput,
+  EventInput,
+  ProjectInput,
+  ScheduleInput,
+  TaskInput,
+  Workspace,
+} from "../domain/models";
+import { generateSchedule } from "../domain/scheduling";
+import { systemClock, type Clock } from "../domain/time";
 
 export interface WorkspaceRepository {
   read(): Promise<Workspace>;
@@ -10,6 +19,11 @@ export interface WorkspaceRepository {
   stopTask(id: string): Promise<Workspace>;
   completeTask(id: string): Promise<Workspace>;
   setDependencies(id: string, prerequisiteIds: string[]): Promise<Workspace>;
+  saveEvent(input: EventInput, id?: string): Promise<Workspace>;
+  deleteEvent(id: string): Promise<Workspace>;
+  replaceAvailability(input: AvailabilityInput[]): Promise<Workspace>;
+  replaceSchedule(input: ScheduleInput): Promise<Workspace>;
+  setBlockLocked(id: string, locked: boolean): Promise<Workspace>;
 }
 
 // Every mutation returns the authoritative workspace after the Rust transaction.
@@ -33,5 +47,22 @@ export class WorkspaceService {
   }
   complete(id: string) {
     return this.repository.completeTask(id);
+  }
+  saveEvent(input: EventInput, id?: string) {
+    return this.repository.saveEvent(input, id);
+  }
+  deleteEvent(id: string) {
+    return this.repository.deleteEvent(id);
+  }
+  saveAvailability(input: AvailabilityInput[]) {
+    return this.repository.replaceAvailability(input);
+  }
+  lock(id: string, locked: boolean) {
+    return this.repository.setBlockLocked(id, locked);
+  }
+  async replan(clock: Clock = systemClock) {
+    const workspace = await this.repository.read();
+    const schedule = generateSchedule(workspace, clock);
+    return this.repository.replaceSchedule(schedule);
   }
 }

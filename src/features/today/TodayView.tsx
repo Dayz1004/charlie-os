@@ -8,17 +8,35 @@ import {
   TIME_ZONE,
 } from "../../domain/time";
 import type { TaskActions } from "../tasks/TasksView";
+import { localDate } from "../../domain/intervals";
+import { scheduledNext } from "../../domain/scheduling";
+import { AgendaDay } from "../calendar/AgendaDay";
+import { PlanningWarnings } from "../calendar/PlanningWarnings";
 
 interface Props extends TaskActions {
   workspace: Workspace;
   now: number;
   onReplan(): void;
   onTasks(): void;
+  onCalendar(): void;
+  onLock(id: string, locked: boolean): void;
 }
 
-export function TodayView({ workspace, now, onReplan, onTasks, ...actions }: Props) {
+export function TodayView({
+  workspace,
+  now,
+  onReplan,
+  onTasks,
+  onCalendar,
+  onLock,
+  ...actions
+}: Props) {
   const plan = planWorkspace(workspace, { now: () => now });
-  const next = plan.next;
+  const scheduled = scheduledNext(workspace, now);
+  const next =
+    !plan.active && scheduled
+      ? (plan.candidates.find((c) => c.task.id === scheduled.id) ?? plan.next)
+      : plan.next;
   return (
     <section aria-labelledby="today-heading" className="space-y-6">
       <p className="text-xs font-medium tracking-widest text-muted uppercase">
@@ -53,6 +71,17 @@ export function TodayView({ workspace, now, onReplan, onTasks, ...actions }: Pro
           ))}
         </aside>
       )}
+      <PlanningWarnings workspace={workspace} />
+      <AgendaDay
+        workspace={workspace}
+        date={localDate(now).toString()}
+        now={now}
+        busy={actions.busy}
+        onLock={onLock}
+      />
+      <button className="button" onClick={onCalendar}>
+        Open Calendar / Availability
+      </button>
       {plan.active && (
         <article className="panel space-y-4" aria-label="Active task">
           <p className="text-xs font-medium tracking-widest text-accent uppercase">In progress</p>
@@ -96,6 +125,11 @@ export function TodayView({ workspace, now, onReplan, onTasks, ...actions }: Pro
               {formatDeadline(next.task.deadline)} · {next.risk} risk
             </p>
             <p className="text-sm leading-6 text-muted">{next.reason}</p>
+            {scheduled?.id === next.task.id && (
+              <p className="text-sm text-muted">
+                Next task in the proposed schedule. Check its work-block time in Calendar.
+              </p>
+            )}
             <button
               className="button-primary"
               disabled={actions.busy}
@@ -113,7 +147,7 @@ export function TodayView({ workspace, now, onReplan, onTasks, ...actions }: Pro
         )}
         <div className="flex gap-3">
           <button className="button" disabled={actions.busy} onClick={onReplan}>
-            Replan
+            Plan / Replan
           </button>
           <button className="button" onClick={onTasks}>
             View tasks
@@ -121,8 +155,8 @@ export function TodayView({ workspace, now, onReplan, onTasks, ...actions }: Pro
         </div>
       </article>
       <p className="text-xs text-muted">
-        Recommendations use deadline risk and manual priority. They compare work with elapsed time
-        until the deadline; calendar availability is not modeled yet.
+        Scheduling uses configured availability and fixed events. Work blocks are proposals;
+        recorded time remains the measure of completed work.
       </p>
     </section>
   );

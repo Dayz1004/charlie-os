@@ -42,6 +42,8 @@ export function TaskForm({ task, projects, busy, onSave, onCancel }: Props) {
         priority: (String(data.get("priority")) || null) as Priority | null,
         estimatedMinutes: data.get("estimate") ? Number(data.get("estimate")) : null,
         deadline,
+        splittable: data.get("splittable") === "on",
+        minimumUsefulBlockMinutes: Number(data.get("minimumBlock")),
       },
       task?.id,
     );
@@ -67,6 +69,22 @@ export function TaskForm({ task, projects, busy, onSave, onCancel }: Props) {
           <textarea name="description" rows={2} defaultValue={task?.description ?? ""} />
         </label>
         <div className="grid gap-4 sm:grid-cols-2">
+          <label className="field">
+            Minimum useful block (minutes)
+            <input
+              name="minimumBlock"
+              type="number"
+              min={1}
+              max={90}
+              step={1}
+              required
+              defaultValue={task?.minimumUsefulBlockMinutes ?? 25}
+            />
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input name="splittable" type="checkbox" defaultChecked={task?.splittable ?? true} />
+            Allow splitting into multiple work blocks
+          </label>
           <label className="field">
             Project
             <select name="projectId" defaultValue={task?.projectId ?? ""}>

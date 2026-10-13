@@ -23,6 +23,8 @@ export interface TaskInput {
   priority: Priority | null;
   deadline: Deadline | null;
   estimatedMinutes: number | null;
+  splittable: boolean;
+  minimumUsefulBlockMinutes: number;
 }
 export interface Task extends TaskInput {
   id: string;
@@ -48,4 +50,65 @@ export interface Workspace {
   tasks: Task[];
   timeEntries: TimeEntry[];
   dependencies: TaskDependency[];
+  events: CalendarEvent[];
+  availability: Availability[];
+  planBlocks: PlanBlock[];
+  revision: number;
+  planningState: PlanningState | null;
+}
+
+export interface EventInput {
+  title: string;
+  startAt: string;
+  endAt: string;
+  projectId: string | null;
+  location: string | null;
+  notes: string | null;
+}
+export interface CalendarEvent extends EventInput {
+  id: string;
+  source: "local";
+  createdAt: string;
+  updatedAt: string;
+}
+export interface AvailabilityInput {
+  weekday: number;
+  startLocal: string;
+  endLocal: string;
+  enabled: boolean;
+}
+export interface Availability extends AvailabilityInput {
+  id: string;
+  timeZone: "America/Santiago";
+}
+export interface PlanBlock {
+  id: string;
+  taskId: string;
+  startAt: string;
+  endAt: string;
+  locked: boolean;
+  source: "scheduler";
+  createdAt: string;
+  updatedAt: string;
+}
+export interface PlanningWarning {
+  code: string;
+  taskId: string | null;
+  at: string | null;
+  message: string;
+  requiredMinutes: number | null;
+  capacityMinutes: number | null;
+}
+export interface PlanningState {
+  plannedAt: string;
+  horizonEnd: string;
+  revision: number;
+  warnings: PlanningWarning[];
+}
+export interface ScheduleInput {
+  expectedRevision: number;
+  plannedAt: string;
+  horizonEnd: string;
+  blocks: PlanBlock[];
+  warnings: PlanningWarning[];
 }

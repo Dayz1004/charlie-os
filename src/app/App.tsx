@@ -1,9 +1,15 @@
+import { useState } from "react";
+import { tauriWorkspace } from "../adapters/tauri-workspace";
+import { WorkspaceService } from "../application/workspace-service";
+import { CalendarView } from "../features/calendar/CalendarView";
+import { ProjectsView } from "../features/projects/ProjectsView";
+import { TasksView } from "../features/tasks/TasksView";
 import { TodayView } from "../features/today/TodayView";
 import { AppShell } from "./AppShell";
 import { useWorkspace } from "./useWorkspace";
 
 const service = new WorkspaceService(tauriWorkspace);
-export type ActiveView = "today" | "tasks" | "projects";
+export type ActiveView = "today" | "tasks" | "projects" | "calendar";
 
 export function App() {
   const [view, setView] = useState<ActiveView>("today");
@@ -44,15 +50,35 @@ export function App() {
       )}
       {workspace && (
         <>
+          {view === "calendar" && (
+            <CalendarView
+              workspace={workspace}
+              now={now}
+              busy={busy}
+              onReplan={() => {
+                void run(() => service.replan());
+              }}
+              onLock={(id, locked) => {
+                void run(() => service.lock(id, locked));
+              }}
+              onSaveEvent={(input, id) => run(() => service.saveEvent(input, id))}
+              onDeleteEvent={(id) => run(() => service.deleteEvent(id))}
+              onSaveAvailability={(input) => run(() => service.saveAvailability(input))}
+            />
+          )}
           {view === "today" && (
             <TodayView
               workspace={workspace}
               now={now}
               {...actions}
               onReplan={() => {
-                void reload();
+                void run(() => service.replan());
               }}
               onTasks={() => setView("tasks")}
+              onCalendar={() => setView("calendar")}
+              onLock={(id, locked) => {
+                void run(() => service.lock(id, locked));
+              }}
             />
           )}
           {view === "tasks" && (
@@ -75,8 +101,3 @@ export function App() {
     </AppShell>
   );
 }
-import { useState } from "react";
-import { tauriWorkspace } from "../adapters/tauri-workspace";
-import { WorkspaceService } from "../application/workspace-service";
-import { ProjectsView } from "../features/projects/ProjectsView";
-import { TasksView } from "../features/tasks/TasksView";

@@ -2,7 +2,9 @@
 
 A local-first personal workspace for tasks, projects, and time. `PROJECT_SPEC.md` defines the product; `AGENTS.md` contains contributor guidelines.
 
-Milestone 1 implements the first desktop vertical slice: create/edit a task, persist it in SQLite, recommend what to do next, start a timer, stop or complete the task, and recalculate the recommendation. Today, Tasks, and basic Projects are functional. Inbox, Calendar, and Settings remain unavailable. No AI, OAuth, or external integrations are connected.
+Milestone 2 adds local Events, weekly Availability, deterministic work scheduling, and Calendar views to the task/time vertical slice. Today, Tasks, basic Projects, and Calendar are functional. Inbox and Settings remain unavailable. No AI, OAuth, or external integrations are connected.
+
+In Calendar, save enabled availability windows and fixed events, then select **Plan / Replan**. The scheduler proposes work across the next 42 Santiago days, preserves past/ongoing and locked future blocks, and reports insufficient capacity. Tasks keep their estimates and deadlines; proposed work does not count as recorded time. Use Week or Month to inspect the plan and lock future blocks. Replanning is an explicit action.
 
 ## Development
 
@@ -57,16 +59,18 @@ The seed adds one fictitious task only when the task table is empty. Both enviro
 - `src/application/`: repository interface and frontend use cases.
 - `src/adapters/`: typed Tauri command/DTO bridge. Keep its contract aligned with Rust `commands.rs` and `domain.rs`.
 - `src/app/`: shell, composition, navigation, and transient state projected from backend snapshots.
-- `src/features/`: Today, Tasks, and Projects views.
+- `src/features/`: Today, Tasks, Projects, and Calendar views.
 - `src/styles/`: semantic tokens and Tailwind styles; system light/dark mode supported.
 - `src-tauri/src/domain.rs`: DTOs, validation, injectable backend clock, and elapsed-time rules.
 - `src-tauri/src/application.rs`: use cases, identity creation, clock injection.
-- `src-tauri/src/repository.rs`: SQLite queries and atomic persistence transitions.
+- `src-tauri/src/repository.rs`, `schedule_repository.rs`: SQLite queries and atomic persistence transitions, including calendar data and schedule validation.
 - `src-tauri/src/database.rs`, `src-tauri/migrations/`: connection setup and immutable versioned migrations.
 - `src-tauri/tests/`: persistence and migration integration tests.
 
 [Milestone 1 decisions and validation](docs/MILESTONE_1.md) describe the schema, heuristic, limits, and desktop smoke test.
 
+[Milestone 2 decisions and validation](docs/MILESTONE_2.md) specify the scheduling algorithm, overload detection, migration, DST semantics, and completed desktop restart scenario.
+
 ## Added dependencies
 
-`@tauri-apps/api` supplies the IPC bridge. `@js-temporal/polyfill` provides timezone-aware calendar-date and local-time conversion, including Chilean DST. `vitest` runs frontend domain tests. Rust adds bundled `rusqlite` for offline SQLite, `serde` for typed DTO serialization, `chrono` for timestamps and calendar validation, and `uuid` for stable identities. `tempfile` and `serde_json` support integration tests. React state is sufficient for this slice; no global state library is required.
+`@tauri-apps/api` supplies the IPC bridge. `@js-temporal/polyfill` provides timezone-aware calendar-date and local-time conversion, including Chilean DST. `vitest` runs frontend domain tests. Rust uses bundled `rusqlite` for offline SQLite, `serde`/`serde_json` for typed DTOs and saved warnings, `chrono`/`chrono-tz` for timestamps and Santiago availability validation, and `uuid` for stable identities. `tempfile` supports integration tests. No calendar library or new frontend dependency was added in Milestone 2. React state remains sufficient.
