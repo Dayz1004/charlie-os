@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-The verified Milestone 0 foundation is extended by Milestones 1 and 2: local tasks/projects, SQLite persistence, task time tracking, deterministic scheduling, local events, availability, and Today/Week/Month views. `PROJECT_SPEC.md` remains the product source of truth; `docs/MILESTONE_1.md` and `docs/MILESTONE_2.md` record implementation decisions.
+The verified Milestone 0 foundation is extended by Milestones 1–3: local tasks/projects, SQLite persistence, task time tracking, deterministic scheduling, local events, availability, and Today/Week/Month views. `docs/PRODUCT_SPEC.md` remains the product source of truth; `docs/MILESTONE_1.md`, `docs/MILESTONE_2.md`, and `docs/MILESTONE_3.md` record implementation decisions.
 
 - `src/domain/`: pure models, clock/date rules, priority and planning. No React or persistence imports.
 - `src/application/`: use cases and repository interfaces.

@@ -1,5 +1,8 @@
 # CHARLIE OS
 
+> Estado de implementación: este documento conserva la visión y el roadmap originales, que incluyen funciones futuras. El [README](../README.md) resume las capacidades actuales; los registros [1](MILESTONE_1.md), [2](MILESTONE_2.md) y [3](MILESTONE_3.md) documentan las decisiones implementadas. La planificación determinista, disponibilidad y bloques de trabajo ya existen; IA, lenguaje natural e integraciones externas siguen pendientes. La captura rápida reemplaza el Inbox independiente y el estado frontend usa React, sin Zustand.
+
+
 ## 1. Visión
 
 **CHARLIE OS** es un asistente personal inteligente de gestión de tiempo, tareas y proyectos.
@@ -511,7 +514,7 @@ Conceptualmente:
 ┌───────────────────────────────────────────────┐
 │ CHARLIE                                       │
 │                                               │
-│ Buenos días, Vicente.                         │
+│ Buenos días.                                  │
 │ Lunes 5 de octubre                            │
 │                                               │
 │ ⚠ 2 tareas requieren atención                │
@@ -586,7 +589,7 @@ Con saludo adecuado según horario.
 Ejemplo:
 
 ```text
-Buenos días, Vicente.
+Buenos días.         
 ```
 
 ---

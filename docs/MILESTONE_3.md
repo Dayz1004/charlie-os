@@ -2,9 +2,9 @@
 
 ## Scope and preflight
 
-Preflight confirmed branch `feat/daily-driver-ux`, a clean working tree, and the merged Milestone 2 commit `9131917`. Read `PROJECT_SPEC.md`, `AGENTS.md`, and the first two milestone records before editing. This milestone implements the daily UX described in specification sections 10–16, 23–24, and 30 while preserving the deterministic scheduling rules documented in Milestone 2.
+Preflight confirmed branch `feat/daily-driver-ux`, a clean working tree, and the merged Milestone 2 commit `9131917`. Read [product specification](PRODUCT_SPEC.md), `AGENTS.md`, and the first two milestone records before editing. This milestone implements the daily UX described in specification sections 10–16, 23–24, and 30 while preserving the deterministic scheduling rules documented in Milestone 2.
 
-The implementation is ready for code review. The requested native walkthrough is **partially complete**: the user stopped Computer Use with the physical Escape key before the final Tasks/responsive/restart checks. No desktop automation was attempted after that interruption. Do not treat this milestone as fully validated until the remaining manual checks below are completed.
+The implementation is ready for code review. The initial Computer Use walkthrough was interrupted before its final checks. In a subsequent manual verification on the new PC, the user confirmed quick task creation, persisted task data, Settings/theme persistence, reduced desktop window usability, closing and reopening the native app, and persistence across restart. The verification record below separates that completed follow-up from detailed scenarios not individually confirmed.
 
 ## Daily workflow and visual changes
 
@@ -67,10 +67,21 @@ The sandbox initially blocked dependency/toolchain path access; the checks succe
 - Inspected project colors/counts and created a fourth fictitious project with a persisted color.
 - Inspected Settings and saved the light appearance. The native UI visibly changed from system-dark to light and showed saved feedback. Horizon persistence/use is covered by the automated tests; changing it through native controls was not exercised.
 
-The user then stopped Computer Use with the physical Escape key. Remaining native checks:
+The user then stopped Computer Use with the physical Escape key. No further desktop automation was attempted after that interruption.
 
-1. Walk through the final Tasks filters/editor and the new project-to-tasks link.
-2. Inspect the final compact project grid, short-block styling, and the common smaller/minimum window layouts after the last refinements.
-3. Replan after the newly created/edited event and availability save, inspect event avoidance and retained locks, then close and reopen the desktop app against the same QA database. Verify tasks, project colors, events, enabled flags, warnings, blocks/locks, timers, and theme remain available.
+### Follow-up manual verification on the new PC
 
-Automated reopen tests confirm disk persistence for the new fields and all existing calendar/timer data, but they do **not** replace this requested native restart walkthrough. No commit, push, merge, or next-milestone work was performed.
+The user subsequently confirmed these native checks as completed:
+
+- Quick task creation and persisted task data.
+- Settings/theme persistence.
+- Usability with a reduced desktop window.
+- Closing and reopening the native app, with persistence across restart.
+
+These are user-performed manual checks, separate from the earlier automated walkthrough and integration tests. The native restart and reduced-window checks are now complete within that reported scope.
+
+### Detailed scenarios not individually confirmed
+
+The follow-up did not separately report the final Tasks filters/editor and project-to-tasks link, compact project grid and short-block styling at the exact minimum window size, or the combined event/availability edit → replan → restart scenario with every calendar field, lock, and timer inspected. Those narrower scenarios remain unconfirmed; they do not negate the completed task creation, settings, reduced-window, and restart checks above. Changing the planning horizon through native controls also remains unconfirmed, as noted in the initial walkthrough.
+
+Automated reopen tests additionally cover disk persistence for the new fields and existing calendar/timer data. No commit, push, merge, or next-milestone work was performed as part of this documentation update.

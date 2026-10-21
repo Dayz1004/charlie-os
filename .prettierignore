@@ -1,6 +1,6 @@
 # Preserve the supplied contributor guide and product source of truth.
 AGENTS.md
-PROJECT_SPEC.md
+docs/PRODUCT_SPEC.md
 pnpm-lock.yaml
 src-tauri/
 dist/
