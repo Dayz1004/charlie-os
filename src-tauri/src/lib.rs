@@ -5,6 +5,8 @@ pub mod database;
 pub mod domain;
 pub mod repository;
 mod schedule_repository;
+#[cfg(debug_assertions)]
+mod seed;
 
 use application::TaskService;
 use domain::SystemClock;
@@ -32,26 +34,15 @@ pub fn run() {
             #[cfg(debug_assertions)]
             let mut service = service;
             #[cfg(debug_assertions)]
-            if std::env::var("CHARLIE_SEED").as_deref() == Ok("1")
-                && service.snapshot()?.tasks.is_empty()
-            {
-                service.create_task(domain::TaskInput {
-                    title: "Fictitious development task".into(),
-                    description: None,
-                    project_id: None,
-                    status: domain::TaskStatus::Todo,
-                    priority: None,
-                    deadline: None,
-                    estimated_minutes: Some(30),
-                    splittable: true,
-                    minimum_useful_block_minutes: 25,
-                })?;
+            if std::env::var("CHARLIE_SEED").as_deref() == Ok("1") {
+                seed::populate(&mut service, chrono::Utc::now())?;
             }
             app.manage(Mutex::new(service));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             commands::read_workspace,
+            commands::save_preferences,
             commands::create_task,
             commands::update_task,
             commands::create_project,

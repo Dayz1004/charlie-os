@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import type { CalendarEvent, EventInput, Project } from "../../domain/models";
 import { instantToLocalInput, localDeadlineToInstant, TIME_ZONE } from "../../domain/time";
+import { instant } from "../../domain/intervals";
 
 export function EventForm({
   event,
@@ -26,11 +27,14 @@ export function EventForm({
       startAt = localDeadlineToInstant(String(data.get("startAt")));
       endAt = localDeadlineToInstant(String(data.get("endAt")));
     } catch {
-      setError(
-        "Enter valid Santiago times. Ambiguous and nonexistent daylight-saving times are rejected.",
-      );
+      setError("Revisa los horarios. La hora debe existir y ser inequívoca en Santiago.");
       return;
     }
+    if (instant(endAt) <= instant(startAt)) {
+      setError("La hora de fin debe ser posterior a la de inicio.");
+      return;
+    }
+    setError("");
     if (
       await onSave(
         {
@@ -49,48 +53,58 @@ export function EventForm({
   return (
     <form
       className="panel space-y-4"
-      aria-label={event ? "Edit event" : "Create event"}
+      aria-label={event ? "Editar evento" : "Nuevo evento"}
       onSubmit={(e) => {
         void submit(e);
       }}
     >
       <h2 className="font-medium">
-        {event ? "Edit event" : "Create event"} · {TIME_ZONE}
+        {event ? "Editar evento" : "Nuevo evento"} · {TIME_ZONE}
       </h2>
       {error && <p role="alert">{error}</p>}
       <fieldset disabled={busy} className="space-y-4">
         <label className="field">
-          Event title
+          Nombre del evento
           <input name="title" required maxLength={200} autoFocus defaultValue={event?.title} />
         </label>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="field">
-            Event start
+            Inicio
             <input
               name="startAt"
               type="datetime-local"
-              step="0.001"
+              step={event ? "0.001" : "60"}
               required
-              defaultValue={instantToLocalInput(event?.startAt ?? new Date(now).toISOString())}
+              defaultValue={
+                event
+                  ? instantToLocalInput(event.startAt)
+                  : instantToLocalInput(
+                      new Date(Math.ceil(now / 1800000) * 1800000).toISOString(),
+                    ).slice(0, 16)
+              }
             />
           </label>
           <label className="field">
-            Event end
+            Fin
             <input
               name="endAt"
               type="datetime-local"
-              step="0.001"
+              step={event ? "0.001" : "60"}
               required
-              defaultValue={instantToLocalInput(
-                event?.endAt ?? new Date(now + 3600000).toISOString(),
-              )}
+              defaultValue={
+                event
+                  ? instantToLocalInput(event.endAt)
+                  : instantToLocalInput(
+                      new Date(Math.ceil(now / 1800000) * 1800000 + 3600000).toISOString(),
+                    ).slice(0, 16)
+              }
             />
           </label>
         </div>
         <label className="field">
-          Project
+          Proyecto
           <select name="projectId" defaultValue={event?.projectId ?? ""}>
-            <option value="">No project</option>
+            <option value="">Sin proyecto</option>
             {projects.map((p) => (
               <option value={p.id} key={p.id}>
                 {p.name}
@@ -98,20 +112,28 @@ export function EventForm({
             ))}
           </select>
         </label>
-        <label className="field">
-          Location
-          <input name="location" defaultValue={event?.location ?? ""} />
-        </label>
-        <label className="field">
-          Notes
-          <textarea name="notes" defaultValue={event?.notes ?? ""} />
-        </label>
+        <details
+          className="advanced-fields"
+          open={event?.location || event?.notes ? true : undefined}
+        >
+          <summary>Lugar y notas</summary>
+          <div className="space-y-3 mt-3">
+            <label className="field">
+              Lugar
+              <input name="location" defaultValue={event?.location ?? ""} />
+            </label>
+            <label className="field">
+              Notas
+              <textarea name="notes" defaultValue={event?.notes ?? ""} />
+            </label>
+          </div>
+        </details>
         <div className="flex gap-3">
           <button className="button-primary" type="submit">
-            Save event
+            Guardar evento
           </button>
           <button className="button" type="button" onClick={onCancel}>
-            Cancel
+            Cancelar
           </button>
         </div>
       </fieldset>

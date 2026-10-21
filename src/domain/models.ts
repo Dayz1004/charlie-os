@@ -8,6 +8,7 @@ export interface ProjectInput {
   name: string;
   description: string | null;
   status: ProjectStatus;
+  color: string;
 }
 export interface Project extends ProjectInput {
   id: string;
@@ -46,6 +47,7 @@ export interface TaskDependency {
   dependsOnTaskId: string;
 }
 export interface Workspace {
+  preferences: Preferences;
   projects: Project[];
   tasks: Task[];
   timeEntries: TimeEntry[];
@@ -55,6 +57,11 @@ export interface Workspace {
   planBlocks: PlanBlock[];
   revision: number;
   planningState: PlanningState | null;
+}
+
+export interface Preferences {
+  theme: "system" | "dark" | "light";
+  horizonDays: number;
 }
 
 export interface EventInput {

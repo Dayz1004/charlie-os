@@ -26,6 +26,7 @@ function task(id: string, changes: Partial<Task> = {}): Task {
 }
 function workspace(tasks: Task[], changes: Partial<Workspace> = {}): Workspace {
   return {
+    preferences: { theme: "system", horizonDays: 42 },
     tasks,
     projects: [],
     dependencies: [],
@@ -79,6 +80,7 @@ describe("deterministic planning", () => {
       const project: Project = {
         id: "p",
         name: "p",
+        color: "#6d8c80",
         description: null,
         status,
         createdAt: "2026-10-01T00:00:00Z",

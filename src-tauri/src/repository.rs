@@ -78,8 +78,8 @@ impl SqliteRepository {
 
     pub fn snapshot(&mut self) -> Result<Snapshot> {
         let tx = self.connection.transaction()?;
-        let projects = tx.prepare("SELECT id, name, description, status, created_at, updated_at, archived_at FROM projects ORDER BY created_at, id")?
-            .query_map([], |row| Ok(Project { id: row.get(0)?, name: row.get(1)?, description: row.get(2)?, status: row.get(3)?, created_at: row.get(4)?, updated_at: row.get(5)?, archived_at: row.get(6)? }))?
+        let projects = tx.prepare("SELECT id, name, description, status, created_at, updated_at, archived_at, color FROM projects ORDER BY created_at, id")?
+            .query_map([], |row| Ok(Project { id: row.get(0)?, name: row.get(1)?, description: row.get(2)?, status: row.get(3)?, created_at: row.get(4)?, updated_at: row.get(5)?, archived_at: row.get(6)?, color: row.get(7)? }))?
             .collect::<std::result::Result<Vec<_>, _>>()?;
         let tasks = tx.prepare("SELECT t.id, t.title, t.description, t.project_id, t.status, t.priority, t.deadline_kind, t.deadline_value, t.estimated_minutes, t.created_at, t.updated_at, t.completed_at, COALESCE((SELECT SUM(duration_millis) / 60000.0 FROM time_entries WHERE task_id = t.id), 0.0), t.splittable, t.minimum_useful_block_minutes FROM tasks t ORDER BY created_at, id")?
             .query_map([], task_from_row)?.collect::<std::result::Result<Vec<_>, _>>()?;
@@ -90,8 +90,19 @@ impl SqliteRepository {
             .query_map([], |row| Ok(TaskDependency { task_id: row.get(0)?, depends_on_task_id: row.get(1)? }))?
             .collect::<std::result::Result<Vec<_>, _>>()?;
         let calendar = crate::schedule_repository::read_calendar(&tx)?;
+        let preferences = tx.query_row(
+            "SELECT theme, horizon_days FROM preferences WHERE id = 1",
+            [],
+            |row| {
+                Ok(Preferences {
+                    theme: row.get(0)?,
+                    horizon_days: row.get(1)?,
+                })
+            },
+        )?;
         tx.commit()?;
         Ok(Snapshot {
+            preferences,
             projects,
             tasks,
             time_entries,
@@ -176,9 +187,9 @@ impl SqliteRepository {
         }
         let archived = (input.status == ProjectStatus::Archived).then_some(now);
         if create {
-            tx.execute("INSERT INTO projects(id, name, description, status, created_at, updated_at, archived_at) VALUES (?1, ?2, ?3, ?4, ?5, ?5, ?6)", params![id, input.name, input.description, input.status.as_str(), now, archived])?;
+            tx.execute("INSERT INTO projects(id, name, description, status, created_at, updated_at, archived_at, color) VALUES (?1, ?2, ?3, ?4, ?5, ?5, ?6, ?7)", params![id, input.name, input.description, input.status.as_str(), now, archived, input.color])?;
         } else {
-            tx.execute("UPDATE projects SET name = ?2, description = ?3, status = ?4, updated_at = ?5, archived_at = CASE WHEN ?4 = 'archived' THEN COALESCE(archived_at, ?6) ELSE NULL END WHERE id = ?1", params![id, input.name, input.description, input.status.as_str(), now, archived])?;
+            tx.execute("UPDATE projects SET name = ?2, description = ?3, status = ?4, updated_at = ?5, archived_at = CASE WHEN ?4 = 'archived' THEN COALESCE(archived_at, ?6) ELSE NULL END, color = ?7 WHERE id = ?1", params![id, input.name, input.description, input.status.as_str(), now, archived, input.color])?;
         }
         tx.commit()?;
         Ok(())
@@ -220,6 +231,14 @@ impl SqliteRepository {
             params![id, now],
         )?;
         tx.commit()?;
+        Ok(())
+    }
+
+    pub fn save_preferences(&mut self, input: &Preferences) -> Result<()> {
+        self.connection.execute(
+            "UPDATE preferences SET theme = ?1, horizon_days = ?2 WHERE id = 1",
+            params![input.theme, input.horizon_days],
+        )?;
         Ok(())
     }
 

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import type { Deadline, Priority, Project, Task, TaskInput, TaskStatus } from "../../domain/models";
-import { instantToLocalInput, localDeadlineToInstant, TIME_ZONE } from "../../domain/time";
+import { instantToLocalInput, localDeadlineToInstant } from "../../domain/time";
+import { projectStatusLabels } from "../../presentation/workspace";
 
 interface Props {
   task?: Task;
@@ -9,9 +10,10 @@ interface Props {
   onSave(input: TaskInput, id?: string): Promise<boolean>;
   onCancel(): void;
 }
-
 export function TaskForm({ task, projects, busy, onSave, onCancel }: Props) {
-  const [deadlineKind, setDeadlineKind] = useState(task?.deadline?.kind ?? "none");
+  const [deadlineKind, setDeadlineKind] = useState<"date" | "instant">(
+    task?.deadline?.kind ?? "date",
+  );
   const [error, setError] = useState<string | null>(null);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -19,17 +21,13 @@ export function TaskForm({ task, projects, busy, onSave, onCancel }: Props) {
     let deadline: Deadline | null = null;
     try {
       const value = String(data.get("deadline") ?? "");
-      if (deadlineKind !== "none") {
-        if (!value) throw new Error("Missing deadline");
+      if (value)
         deadline =
           deadlineKind === "date"
             ? { kind: "date", value }
             : { kind: "instant", value: localDeadlineToInstant(value) };
-      }
     } catch {
-      setError(
-        "Enter a valid deadline. Timed deadlines use America/Santiago; ambiguous or nonexistent daylight-saving times are not accepted.",
-      );
+      setError("Revisa la fecha límite. La hora debe existir y ser inequívoca en Santiago.");
       return;
     }
     setError(null);
@@ -51,78 +49,45 @@ export function TaskForm({ task, projects, busy, onSave, onCancel }: Props) {
   }
   return (
     <form
-      onSubmit={(event) => {
-        void submit(event);
+      onSubmit={(e) => {
+        void submit(e);
       }}
       className="panel space-y-4"
-      aria-label={task ? "Edit task" : "Create task"}
+      aria-label={task ? "Editar tarea" : "Nueva tarea"}
     >
-      <h2 className="text-lg font-medium">{task ? "Edit task" : "Create task"}</h2>
-      {error && <p role="alert">{error}</p>}
+      <h2 className="text-lg font-medium">{task ? "Editar tarea" : "Nueva tarea"}</h2>
+      {error && (
+        <p role="alert" className="text-warning">
+          {error}
+        </p>
+      )}
       <fieldset disabled={busy} className="space-y-4">
         <label className="field">
-          Title
-          <input name="title" required maxLength={200} defaultValue={task?.title} autoFocus />
-        </label>
-        <label className="field">
-          Description
-          <textarea name="description" rows={2} defaultValue={task?.description ?? ""} />
+          ¿Qué quieres hacer?
+          <input
+            name="title"
+            required
+            maxLength={200}
+            defaultValue={task?.title}
+            placeholder="Por ejemplo, revisar el informe"
+            autoFocus
+          />
         </label>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="field">
-            Minimum useful block (minutes)
-            <input
-              name="minimumBlock"
-              type="number"
-              min={1}
-              max={90}
-              step={1}
-              required
-              defaultValue={task?.minimumUsefulBlockMinutes ?? 25}
-            />
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input name="splittable" type="checkbox" defaultChecked={task?.splittable ?? true} />
-            Allow splitting into multiple work blocks
-          </label>
-          <label className="field">
-            Project
+            Proyecto
             <select name="projectId" defaultValue={task?.projectId ?? ""}>
-              <option value="">No project</option>
+              <option value="">Sin proyecto</option>
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name} ({p.status})
+                  {p.name}
+                  {p.status !== "active" ? ` · ${projectStatusLabels[p.status]}` : ""}
                 </option>
               ))}
             </select>
           </label>
           <label className="field">
-            Status
-            <select name="status" defaultValue={task?.status ?? "todo"}>
-              {task?.status === "in_progress" ? (
-                <option value="in_progress">In progress — use Stop/Complete</option>
-              ) : (
-                <>
-                  <option value="todo">To do</option>
-                  <option value="inbox">Inbox</option>
-                  <option value="blocked">Blocked</option>
-                  <option value="cancelled">Cancelled</option>
-                  {task?.status === "done" && <option value="done">Done</option>}
-                </>
-              )}
-            </select>
-          </label>
-          <label className="field">
-            Manual priority
-            <select name="priority" defaultValue={task?.priority ?? ""}>
-              <option value="">Unspecified</option>
-              <option value="low">Low</option>
-              <option value="normal">Normal</option>
-              <option value="high">High</option>
-            </select>
-          </label>
-          <label className="field">
-            Estimated minutes
+            Duración estimada (min)
             <input
               name="estimate"
               type="number"
@@ -130,48 +95,94 @@ export function TaskForm({ task, projects, busy, onSave, onCancel }: Props) {
               max={525600}
               step={1}
               defaultValue={task?.estimatedMinutes ?? ""}
-              placeholder="Optional"
+              placeholder="Opcional, por ejemplo 60"
             />
           </label>
           <label className="field">
-            Deadline type
-            <select
-              value={deadlineKind}
-              onChange={(e) => setDeadlineKind(e.target.value as typeof deadlineKind)}
-            >
-              <option value="none">No deadline</option>
-              <option value="date">Date only · end of Santiago day</option>
-              <option value="instant">Date and time · Santiago</option>
+            Fecha límite · opcional
+            <input
+              key={deadlineKind}
+              name="deadline"
+              type={deadlineKind === "date" ? "date" : "datetime-local"}
+              min="0001-01-01"
+              max={deadlineKind === "date" ? "9998-12-31" : "9998-12-31T23:59:59.999"}
+              step={deadlineKind === "instant" ? "0.001" : undefined}
+              defaultValue={
+                task?.deadline?.kind === deadlineKind
+                  ? task.deadline.kind === "date"
+                    ? task.deadline.value
+                    : instantToLocalInput(task.deadline.value)
+                  : ""
+              }
+            />
+          </label>
+          <label className="field">
+            Prioridad
+            <select name="priority" defaultValue={task?.priority ?? ""}>
+              <option value="">Sin preferencia</option>
+              <option value="low">Baja</option>
+              <option value="normal">Normal</option>
+              <option value="high">Alta</option>
             </select>
           </label>
-          {deadlineKind !== "none" && (
+        </div>
+        <details open={task ? true : undefined} className="advanced-fields">
+          <summary>Más opciones</summary>
+          <div className="grid gap-4 sm:grid-cols-2 mt-4">
             <label className="field">
-              {deadlineKind === "date" ? "Deadline date" : `Deadline time (${TIME_ZONE})`}
+              Descripción
+              <textarea name="description" rows={2} defaultValue={task?.description ?? ""} />
+            </label>
+            <label className="field">
+              Estado
+              <select name="status" defaultValue={task?.status ?? "todo"}>
+                {task?.status === "in_progress" ? (
+                  <option value="in_progress">En curso · usa Pausar o Completar</option>
+                ) : (
+                  <>
+                    <option value="todo">Pendiente</option>
+                    <option value="inbox">Por revisar</option>
+                    <option value="blocked">Bloqueada</option>
+                    <option value="cancelled">Cancelada</option>
+                    {task?.status === "done" && <option value="done">Completada</option>}
+                  </>
+                )}
+              </select>
+            </label>
+            <label className="field">
+              Tipo de fecha límite
+              <select
+                value={deadlineKind}
+                onChange={(e) => setDeadlineKind(e.target.value as typeof deadlineKind)}
+              >
+                <option value="date">Día completo</option>
+                <option value="instant">Día y hora · Santiago</option>
+              </select>
+            </label>
+            <label className="field">
+              Bloque mínimo útil (min)
               <input
-                key={deadlineKind}
-                name="deadline"
+                name="minimumBlock"
+                type="number"
+                min={1}
+                max={90}
+                step={1}
                 required
-                type={deadlineKind === "date" ? "date" : "datetime-local"}
-                min="0001-01-01"
-                max={deadlineKind === "date" ? "9998-12-31" : "9998-12-31T23:59:59.999"}
-                step={deadlineKind === "instant" ? "0.001" : undefined}
-                defaultValue={
-                  task?.deadline?.kind === deadlineKind
-                    ? task.deadline.kind === "date"
-                      ? task.deadline.value
-                      : instantToLocalInput(task.deadline.value)
-                    : ""
-                }
+                defaultValue={task?.minimumUsefulBlockMinutes ?? 25}
               />
             </label>
-          )}
-        </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input name="splittable" type="checkbox" defaultChecked={task?.splittable ?? true} />
+              Permitir varios bloques de trabajo
+            </label>
+          </div>
+        </details>
         <div className="flex gap-3">
           <button className="button-primary" type="submit">
-            Save task
+            {task ? "Guardar cambios" : "Crear tarea"}
           </button>
           <button className="button" type="button" onClick={onCancel}>
-            Cancel
+            Cancelar
           </button>
         </div>
       </fieldset>

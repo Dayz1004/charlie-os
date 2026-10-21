@@ -1,43 +1,58 @@
 import type { Workspace } from "../../domain/models";
-import { formatMinutes } from "../../domain/time";
+import { planningSummary } from "../../presentation/workspace";
 
-export function PlanningWarnings({ workspace }: { workspace: Workspace }) {
+export function PlanningWarnings({
+  workspace,
+  compact = false,
+}: {
+  workspace: Workspace;
+  compact?: boolean;
+}) {
   const state = workspace.planningState;
+  const warnings = state?.warnings ?? [];
+  const urgent = warnings.filter(
+    (w) => !["missing_estimate", "ineligible", "active_task"].includes(w.code),
+  );
+  const order = [
+    "deadline_capacity",
+    "horizon_capacity",
+    "unscheduled_work",
+    "preserved_conflict",
+    "preserved_late",
+    "preserved_unavailable",
+    "unsplittable",
+    "preserved_ineligible",
+  ];
+  urgent.sort(
+    (a, b) =>
+      (order.indexOf(a.code) < 0 ? order.length : order.indexOf(a.code)) -
+      (order.indexOf(b.code) < 0 ? order.length : order.indexOf(b.code)),
+  );
+  const visible = urgent.slice(0, compact ? 1 : 2);
+  const rest = warnings.filter((w) => !visible.includes(w));
+  if (state && state.revision === workspace.revision && !warnings.length) return null;
   return (
-    <aside className="panel space-y-3" aria-label="Planning warnings">
-      <h2 className="font-medium">Planning status</h2>
-      {!state ? (
-        <p className="text-sm text-muted">
-          No schedule yet. Configure availability and select Plan / Replan.
+    <aside className="notice space-y-2" aria-label="Estado del plan">
+      {!state && <p>Configura tu disponibilidad y planifica para darle un lugar a tu trabajo.</p>}
+      {state && state.revision !== workspace.revision && (
+        <p className="font-medium">
+          Hay cambios desde el último plan. Replanifica para actualizar tu agenda.
         </p>
-      ) : (
-        <>
-          {state.revision !== workspace.revision && (
-            <p className="text-sm">
-              Tasks or calendar data changed. Replan to update the proposed schedule.
-            </p>
-          )}
-          {state.warnings.length === 0 && (
-            <p className="text-sm text-muted">
-              All eligible work fit within the last planning horizon.
-            </p>
-          )}
-          {state.warnings.map((w, index) => (
-            <p key={index} className="text-sm text-muted">
-              {w.taskId
-                ? `${workspace.tasks.find((t) => t.id === w.taskId)?.title ?? "Task"}: `
-                : ""}
-              {w.message}
-              {w.requiredMinutes !== null && w.capacityMinutes !== null && (
-                <>
-                  {" "}
-                  ({formatMinutes(w.requiredMinutes)} required; {formatMinutes(w.capacityMinutes)}{" "}
-                  {w.code === "unscheduled_work" ? "scheduled" : "usable"})
-                </>
-              )}
-            </p>
-          ))}
-        </>
+      )}
+      {visible.map((w, i) => (
+        <p key={i}>{planningSummary(w, workspace)}</p>
+      ))}
+      {rest.length > 0 && (
+        <details>
+          <summary>
+            {rest.length} detalle{rest.length === 1 ? "" : "s"} del plan
+          </summary>
+          <div className="mt-3 space-y-2">
+            {rest.map((w, i) => (
+              <p key={i}>{planningSummary(w, workspace)}</p>
+            ))}
+          </div>
+        </details>
       )}
     </aside>
   );

@@ -6,6 +6,7 @@ pub const MIGRATIONS: &[(i64, &str)] = &[
     (1, include_str!("../migrations/001_tasks.sql")),
     (2, include_str!("../migrations/002_dependencies.sql")),
     (3, include_str!("../migrations/003_scheduling.sql")),
+    (4, include_str!("../migrations/004_daily_driver.sql")),
 ];
 
 pub fn open(path: &Path) -> Result<Connection> {

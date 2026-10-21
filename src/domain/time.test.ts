@@ -48,9 +48,9 @@ describe("Santiago dates and timestamps", () => {
     expect(() => deadlineAt({ kind: "instant", value: "2026-10-06T12:00:00" })).toThrow();
   });
   it("formats a date-only deadline without shifting its day", () => {
-    expect(formatDeadline({ kind: "date", value: "2026-10-06" })).toContain("6 Oct 2026");
-    expect(formatDeadline(null)).toBe("No deadline");
-    expect(dayGreeting(Date.parse("2026-10-07T02:00:00Z"))).toBe("Good evening.");
+    expect(formatDeadline({ kind: "date", value: "2026-10-06" })).toContain("6 oct 2026");
+    expect(formatDeadline(null)).toBe("Sin fecha límite");
+    expect(dayGreeting(Date.parse("2026-10-07T02:00:00Z"))).toBe("Buenas noches.");
   });
 });
 
