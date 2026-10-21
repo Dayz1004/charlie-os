@@ -61,7 +61,7 @@ impl<C: Clock> TaskService<C> {
     }
 
     pub fn create_project(&mut self, mut input: ProjectInput) -> Result<Snapshot> {
-        input.name = validate_name(&input.name)?;
+        input.validate()?;
         self.repository.save_project(
             &Uuid::new_v4().to_string(),
             &input,
@@ -72,7 +72,7 @@ impl<C: Clock> TaskService<C> {
     }
 
     pub fn update_project(&mut self, id: &str, mut input: ProjectInput) -> Result<Snapshot> {
-        input.name = validate_name(&input.name)?;
+        input.validate()?;
         self.repository
             .save_project(id, &input, &timestamp(self.clock.now()), false)?;
         self.snapshot()
@@ -84,6 +84,12 @@ impl<C: Clock> TaskService<C> {
             &Uuid::new_v4().to_string(),
             &timestamp(self.clock.now()),
         )?;
+        self.snapshot()
+    }
+
+    pub fn save_preferences(&mut self, input: &Preferences) -> Result<Snapshot> {
+        input.validate()?;
+        self.repository.save_preferences(input)?;
         self.snapshot()
     }
 

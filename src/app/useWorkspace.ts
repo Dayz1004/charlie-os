@@ -4,8 +4,31 @@ import type { Workspace } from "../domain/models";
 import { systemClock } from "../domain/time";
 
 function errorMessage(error: unknown): string {
-  if (error && typeof error === "object" && "message" in error) return String(error.message);
-  return String(error);
+  const message =
+    error && typeof error === "object" && "message" in error
+      ? String(error.message)
+      : String(error);
+  const translations: [string, string][] = [
+    ["already active", "Ya hay una tarea en curso. Páusala o complétala antes de empezar otra."],
+    [
+      "changed",
+      "Los datos cambiaron mientras se guardaba el plan. Actualiza y vuelve a planificar.",
+    ],
+    ["overlap", "Los horarios se superponen. Ajusta las franjas e inténtalo de nuevo."],
+    ["end must", "La hora de fin debe ser posterior a la de inicio."],
+    ["End must", "La hora de fin debe ser posterior a la de inicio."],
+    ["Stop or complete", "Pausa o completa la tarea en curso antes de cambiar su proyecto."],
+    ["prerequisite", "Esta tarea tiene requisitos pendientes. Complétalos antes de empezar."],
+    ["project must", "Activa el proyecto para poder empezar esta tarea."],
+    ["Only open", "Solo puedes empezar tareas pendientes que estén disponibles."],
+    ["clock", "Revisa el reloj del equipo: la hora actual es anterior al inicio del cronómetro."],
+    ["Name must", "Escribe un nombre de entre 1 y 200 caracteres."],
+    ["escritorio", message],
+  ];
+  return (
+    translations.find(([key]) => message.includes(key))?.[1] ??
+    "No se pudo guardar o cargar el cambio. Revisa los datos y vuelve a intentarlo."
+  );
 }
 
 export function useWorkspace(service: WorkspaceService) {

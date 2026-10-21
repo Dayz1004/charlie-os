@@ -61,6 +61,7 @@ fn tasks_projects_updates_and_both_deadline_kinds_survive_restarts() {
     let mut app = service(&path, clock.clone());
     let project_id = app
         .create_project(ProjectInput {
+            color: "#6d8c80".into(),
             name: "Fixture project".into(),
             description: None,
             status: ProjectStatus::Active,
@@ -400,6 +401,7 @@ fn paused_projects_gate_start_and_cannot_be_archived_with_an_active_task() {
         FixedClock::new(),
     );
     let mut project = ProjectInput {
+        color: "#6d8c80".into(),
         name: "Fixture".into(),
         description: None,
         status: ProjectStatus::Paused,

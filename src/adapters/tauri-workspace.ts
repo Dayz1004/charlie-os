@@ -4,6 +4,7 @@ import type {
   AvailabilityInput,
   EventInput,
   ProjectInput,
+  Preferences,
   ScheduleInput,
   TaskInput,
   Workspace,
@@ -11,6 +12,7 @@ import type {
 
 // Mirrors commands.rs. Keep all command names/DTOs at this adapter boundary.
 interface Commands {
+  save_preferences: { input: Preferences };
   read_workspace: undefined;
   create_task: { input: TaskInput };
   update_task: { id: string; input: TaskInput };
@@ -29,12 +31,13 @@ interface Commands {
 function command<K extends keyof Commands>(name: K, args: Commands[K]): Promise<Workspace> {
   if (!isTauri())
     return Promise.reject(
-      new Error("Open CHARLIE OS with pnpm tauri dev to access the local SQLite workspace."),
+      new Error("Abre CHARLIE OS como aplicación de escritorio para acceder a tus datos locales."),
     );
   return invoke<Workspace>(name, args);
 }
 
 export const tauriWorkspace: WorkspaceRepository = {
+  savePreferences: (input) => command("save_preferences", { input }),
   saveEvent: (input, id) => command("save_event", { input, id: id ?? null }),
   deleteEvent: (id) => command("delete_event", { id }),
   replaceAvailability: (input) => command("replace_availability", { input }),

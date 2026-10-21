@@ -44,6 +44,10 @@ pub fn read_workspace(state: State<'_, AppState>) -> Result<Snapshot> {
     service(&state)?.snapshot()
 }
 #[tauri::command]
+pub fn save_preferences(state: State<'_, AppState>, input: Preferences) -> Result<Snapshot> {
+    service(&state)?.save_preferences(&input)
+}
+#[tauri::command]
 pub fn create_task(state: State<'_, AppState>, input: TaskInput) -> Result<Snapshot> {
     service(&state)?.create_task(input)
 }

@@ -3,6 +3,13 @@ import type { Task, TaskInput, Workspace } from "../../domain/models";
 import { isEligible } from "../../domain/planning";
 import { assessTask } from "../../domain/priority";
 import { formatDeadline, formatMinutes } from "../../domain/time";
+import {
+  taskStatusLabels,
+  priorityLabels,
+  riskLabels,
+  projectColor,
+  projectName,
+} from "../../presentation/workspace";
 import { TaskForm } from "./TaskForm";
 
 export interface TaskActions {
@@ -14,13 +21,14 @@ export interface TaskActions {
 interface Props extends TaskActions {
   workspace: Workspace;
   now: number;
+  initialProject?: string;
   onSave(input: TaskInput, id?: string): Promise<boolean>;
 }
 
-export function TasksView({ workspace, now, onSave, ...actions }: Props) {
+export function TasksView({ workspace, now, onSave, initialProject = "", ...actions }: Props) {
   const [editing, setEditing] = useState<Task | "new" | null>(null);
   const [status, setStatus] = useState("open");
-  const [project, setProject] = useState("");
+  const [project, setProject] = useState(initialProject);
   const activeEntry = workspace.timeEntries.find((entry) => entry.endedAt === null);
   const filtered = workspace.tasks.filter(
     (task) =>
@@ -34,14 +42,14 @@ export function TasksView({ workspace, now, onSave, ...actions }: Props) {
     <section aria-labelledby="tasks-heading" className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 id="tasks-heading" className="text-3xl font-semibold">
-          Tasks
+          Tareas
         </h1>
         <button
           className="button-primary"
           disabled={actions.busy}
           onClick={() => setEditing("new")}
         >
-          Create task
+          + Tarea
         </button>
       </div>
       {editing && (
@@ -56,21 +64,21 @@ export function TasksView({ workspace, now, onSave, ...actions }: Props) {
       )}
       <div className="flex flex-wrap gap-4">
         <label className="field">
-          Filter by status
+          Estado
           <select value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="open">Open tasks</option>
-            <option value="all">All tasks</option>
+            <option value="open">Tareas abiertas</option>
+            <option value="all">Todas las tareas</option>
             {["inbox", "todo", "in_progress", "blocked", "done", "cancelled"].map((s) => (
               <option key={s} value={s}>
-                {s.replace("_", " ")}
+                {taskStatusLabels[s as keyof typeof taskStatusLabels]}
               </option>
             ))}
           </select>
         </label>
         <label className="field">
-          Filter by project
+          Proyecto
           <select value={project} onChange={(e) => setProject(e.target.value)}>
-            <option value="">All projects</option>
+            <option value="">Todos los proyectos</option>
             {workspace.projects.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -80,7 +88,7 @@ export function TasksView({ workspace, now, onSave, ...actions }: Props) {
         </label>
       </div>
       {filtered.length === 0 && (
-        <p className="panel text-muted">No tasks match this view. Create a task to get started.</p>
+        <p className="panel text-muted">No hay tareas en esta vista. Crea una para empezar.</p>
       )}
       <div className="space-y-3">
         {filtered.map((task) => {
@@ -91,35 +99,41 @@ export function TasksView({ workspace, now, onSave, ...actions }: Props) {
           );
           const eligible = isEligible(task, workspace);
           return (
-            <article key={task.id} className="panel space-y-3" aria-label={task.title}>
+            <article
+              key={task.id}
+              className="task-row space-y-2"
+              style={{ borderLeftColor: projectColor(workspace, task.projectId) }}
+              aria-label={task.title}
+            >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <h2 className="text-lg font-medium break-words">{task.title}</h2>
-                <span className="text-xs text-muted">{task.status.replace("_", " ")}</span>
+                <span className="text-xs text-muted">{taskStatusLabels[task.status]}</span>
               </div>
               {task.description && (
                 <p className="text-sm whitespace-pre-wrap text-muted">{task.description}</p>
               )}
               <p className="text-sm text-muted">
-                {workspace.projects.find((p) => p.id === task.projectId)?.name ?? "No project"} ·{" "}
-                {formatDeadline(task.deadline)}
+                {projectName(workspace, task.projectId)} · {formatDeadline(task.deadline)}
               </p>
               <p className="text-sm text-muted">
-                Estimate:{" "}
-                {task.estimatedMinutes === null ? "Not set" : formatMinutes(task.estimatedMinutes)}{" "}
-                · Recorded: {formatMinutes(task.actualMinutes)} · Priority:{" "}
-                {task.priority ?? "unspecified"}
+                Estimación:{" "}
+                {task.estimatedMinutes === null
+                  ? "Sin estimar"
+                  : formatMinutes(task.estimatedMinutes)}{" "}
+                · Trabajado: {formatMinutes(task.actualMinutes)} · Prioridad:{" "}
+                {task.priority ? priorityLabels[task.priority] : "Sin preferencia"}
               </p>
               {task.status !== "done" && task.status !== "cancelled" && (
-                <p className="text-sm" title={risk.reason}>
-                  Risk: {risk.risk}
+                <p className="text-sm" title={`Riesgo ${riskLabels[risk.risk].toLowerCase()}`}>
+                  Riesgo: {riskLabels[risk.risk]}
                   {!eligible && task.status !== "in_progress"
-                    ? " · Unavailable for recommendation"
+                    ? " · No disponible para trabajar"
                     : ""}
                 </p>
               )}
               <div className="flex flex-wrap gap-2">
                 <button className="button" disabled={actions.busy} onClick={() => setEditing(task)}>
-                  Edit
+                  Editar
                 </button>
                 {eligible && (
                   <button
@@ -127,7 +141,7 @@ export function TasksView({ workspace, now, onSave, ...actions }: Props) {
                     disabled={actions.busy || !!activeEntry}
                     onClick={() => actions.onStart(task.id)}
                   >
-                    Start
+                    Empezar
                   </button>
                 )}
                 {task.status === "in_progress" && (
@@ -136,7 +150,7 @@ export function TasksView({ workspace, now, onSave, ...actions }: Props) {
                     disabled={actions.busy}
                     onClick={() => actions.onStop(task.id)}
                   >
-                    Stop
+                    Pausar
                   </button>
                 )}
                 {task.status !== "done" && task.status !== "cancelled" && (
@@ -145,7 +159,7 @@ export function TasksView({ workspace, now, onSave, ...actions }: Props) {
                     disabled={actions.busy}
                     onClick={() => actions.onComplete(task.id)}
                   >
-                    Complete
+                    Completar
                   </button>
                 )}
               </div>

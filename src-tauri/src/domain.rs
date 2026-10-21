@@ -196,6 +196,48 @@ pub struct ProjectInput {
     pub name: String,
     pub description: Option<String>,
     pub status: ProjectStatus,
+    #[serde(default = "default_project_color")]
+    pub color: String,
+}
+
+fn default_project_color() -> String {
+    "#6d8c80".into()
+}
+
+impl ProjectInput {
+    pub fn validate(&mut self) -> Result<()> {
+        self.name = validate_name(&self.name)?;
+        if self.color.len() != 7
+            || !self.color.starts_with('#')
+            || !self.color.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
+        {
+            return Err(AppError::validation(
+                "Project color must be a six-digit hex color.",
+            ));
+        }
+        self.color = self.color.to_ascii_lowercase();
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Preferences {
+    pub theme: String,
+    pub horizon_days: i64,
+}
+
+impl Preferences {
+    pub fn validate(&self) -> Result<()> {
+        if !matches!(self.theme.as_str(), "system" | "dark" | "light")
+            || !(1..=90).contains(&self.horizon_days)
+        {
+            return Err(AppError::validation(
+                "Choose a valid theme and a planning horizon of 1–90 days.",
+            ));
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -205,6 +247,7 @@ pub struct Project {
     pub name: String,
     pub description: Option<String>,
     pub status: ProjectStatus,
+    pub color: String,
     pub created_at: String,
     pub updated_at: String,
     pub archived_at: Option<String>,
@@ -231,6 +274,7 @@ pub struct TaskDependency {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
+    pub preferences: Preferences,
     pub projects: Vec<Project>,
     pub tasks: Vec<Task>,
     pub time_entries: Vec<TimeEntry>,

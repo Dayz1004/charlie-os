@@ -1,15 +1,17 @@
+import { useState } from "react";
 import type { Workspace } from "../../domain/models";
 import { planWorkspace } from "../../domain/planning";
+import { dayGreeting, entryMinutes, formatMinutes, TIME_ZONE } from "../../domain/time";
+import { instant, localDate } from "../../domain/intervals";
+import { dayLoad, scheduledNext } from "../../domain/scheduling";
 import {
-  dayGreeting,
-  entryMinutes,
-  formatDeadline,
-  formatMinutes,
-  TIME_ZONE,
-} from "../../domain/time";
+  deadlineHint,
+  formatTime,
+  projectColor,
+  projectName,
+  remainingDayCapacity,
+} from "../../presentation/workspace";
 import type { TaskActions } from "../tasks/TasksView";
-import { localDate } from "../../domain/intervals";
-import { scheduledNext } from "../../domain/scheduling";
 import { AgendaDay } from "../calendar/AgendaDay";
 import { PlanningWarnings } from "../calendar/PlanningWarnings";
 
@@ -21,7 +23,6 @@ interface Props extends TaskActions {
   onCalendar(): void;
   onLock(id: string, locked: boolean): void;
 }
-
 export function TodayView({
   workspace,
   now,
@@ -31,133 +32,223 @@ export function TodayView({
   onLock,
   ...actions
 }: Props) {
+  const [skipped, setSkipped] = useState<string[]>([]);
   const plan = planWorkspace(workspace, { now: () => now });
   const scheduled = scheduledNext(workspace, now);
-  const next =
-    !plan.active && scheduled
-      ? (plan.candidates.find((c) => c.task.id === scheduled.id) ?? plan.next)
-      : plan.next;
+  const candidates = plan.candidates.filter((c) => !skipped.includes(c.task.id));
+  const next = !plan.active
+    ? (candidates.find((c) => c.task.id === scheduled?.id) ?? candidates[0])
+    : null;
+  const focus = plan.active?.task ?? next?.task;
+  const block = focus
+    ? workspace.planBlocks.find((b) => b.taskId === focus.id && instant(b.endAt) > now)
+    : null;
+  const event = workspace.events
+    .filter((e) => instant(e.endAt) > now)
+    .sort((a, b) => instant(a.startAt) - instant(b.startAt))[0];
+  const today = localDate(now);
+  const load = dayLoad(workspace, today);
+  const free = remainingDayCapacity(workspace, now);
+  const completed = workspace.tasks.filter(
+    (t) => t.completedAt && localDate(instant(t.completedAt)).equals(today),
+  ).length;
   return (
-    <section aria-labelledby="today-heading" className="space-y-6">
-      <p className="text-xs font-medium tracking-widest text-muted uppercase">
-        Your day, with intention
-      </p>
-      <h1 id="today-heading" className="text-3xl font-semibold">
-        {dayGreeting(now)}
-      </h1>
-      <p className="text-sm text-muted">
-        {new Intl.DateTimeFormat("en-GB", { dateStyle: "full", timeZone: TIME_ZONE }).format(now)} ·{" "}
-        {TIME_ZONE}
-      </p>
-      <div className="flex flex-wrap gap-3 text-sm text-muted">
-        <span>{plan.candidates.length} available tasks</span>
-        <span>{workspace.tasks.filter((t) => t.status === "done").length} completed</span>
-        <span>
-          {formatMinutes(workspace.tasks.reduce((sum, task) => sum + task.actualMinutes, 0))}{" "}
-          recorded
-        </span>
+    <section aria-labelledby="today-heading" className="space-y-5">
+      <div className="view-header">
+        <div>
+          <p className="eyebrow">Tu día, con intención</p>
+          <h1 id="today-heading">{dayGreeting(now)}</h1>
+          <p className="text-muted text-sm mt-2">
+            {new Intl.DateTimeFormat("es-CL", { dateStyle: "full", timeZone: TIME_ZONE }).format(
+              now,
+            )}
+          </p>
+        </div>
+        <button
+          className="button-primary"
+          disabled={actions.busy}
+          onClick={() => {
+            setSkipped([]);
+            onReplan();
+          }}
+        >
+          {workspace.planningState ? "Replanificar" : "Planificar"}
+        </button>
       </div>
-      {plan.attention.length > 0 && (
-        <aside className="panel space-y-2" aria-label="Deadline alerts">
-          <h2 className="font-medium">
-            {plan.attention.length} deadline{plan.attention.length === 1 ? "" : "s"} require
-            attention
-          </h2>
-          {plan.attention.map((item) => (
-            <p key={item.task.id} className="text-sm text-muted">
-              {item.task.title} · {item.risk} risk · {formatDeadline(item.task.deadline)}
-              {item.task.status === "blocked" ? " · blocked" : ""}
-            </p>
-          ))}
+      <div className="daily-summary" aria-label="Resumen del día">
+        <div>
+          <strong>{formatMinutes(load.plannedMinutes)}</strong>
+          <span>de trabajo planificado hoy</span>
+        </div>
+        <div>
+          <strong>{formatMinutes(free)}</strong>
+          <span>libres desde ahora</span>
+        </div>
+        <div>
+          <strong>{completed}</strong>
+          <span>{completed === 1 ? "tarea completada hoy" : "tareas completadas hoy"}</span>
+        </div>
+      </div>
+      <div className="today-focus-grid">
+        <article
+          className="focus-panel"
+          aria-label={plan.active ? "Tarea en curso" : "Qué hacer ahora"}
+          style={{ borderColor: projectColor(workspace, focus?.projectId ?? null) }}
+        >
+          <p className="eyebrow">
+            {plan.active
+              ? "En curso"
+              : block && instant(block.startAt) > now
+                ? "Tu próximo bloque"
+                : "Ahora"}
+          </p>
+          {focus ? (
+            <>
+              <h2 className="text-2xl font-semibold mt-3 break-words">{focus.title}</h2>
+              <p className="text-sm text-muted mt-2">
+                {projectName(workspace, focus.projectId)} · {deadlineHint(workspace, focus.id, now)}
+              </p>
+              <p className="text-sm mt-4">
+                {plan.active
+                  ? `${formatMinutes(entryMinutes(plan.active.entry, now))} en esta sesión`
+                  : `${formatMinutes(next!.remainingMinutes)} de trabajo restante${focus.estimatedMinutes === null ? " · estimación provisional" : ""}`}
+              </p>
+              {block && (
+                <p className="text-sm text-muted mt-1">
+                  {localDate(instant(block.startAt)).equals(today)
+                    ? "Hoy"
+                    : localDate(instant(block.startAt)).toLocaleString("es-CL", {
+                        weekday: "long",
+                        day: "numeric",
+                      })}
+                  , {formatTime(block.startAt)}–{formatTime(block.endAt)}
+                  {block.locked ? " · reservado" : ""}
+                </p>
+              )}
+              <div className="flex flex-wrap gap-2 mt-5">
+                {plan.active ? (
+                  <>
+                    <button
+                      className="button-primary"
+                      disabled={actions.busy}
+                      onClick={() => actions.onComplete(focus.id)}
+                    >
+                      Completar
+                    </button>
+                    <button
+                      className="button"
+                      disabled={actions.busy}
+                      onClick={() => actions.onStop(focus.id)}
+                    >
+                      Pausar
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      className="button-primary"
+                      disabled={actions.busy}
+                      onClick={() => actions.onStart(focus.id)}
+                    >
+                      Empezar
+                    </button>
+                    <button
+                      className="button"
+                      disabled={actions.busy}
+                      onClick={() => actions.onComplete(focus.id)}
+                    >
+                      Completar
+                    </button>
+                    <button
+                      className="button"
+                      disabled={actions.busy}
+                      onClick={() => setSkipped([...skipped, focus.id])}
+                    >
+                      Otra tarea
+                    </button>
+                  </>
+                )}
+              </div>
+              {plan.active && (
+                <p className="text-xs text-muted mt-3">
+                  El cronómetro sigue hasta que pauses o completes la tarea.
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              <h2 className="text-xl font-medium mt-3">
+                {skipped.length ? "Has revisado las opciones." : "Un momento para ordenar tu día."}
+              </h2>
+              <p className="text-sm text-muted mt-2">
+                Crea una tarea o revisa las que están bloqueadas.
+              </p>
+              <button
+                className="button mt-4"
+                onClick={skipped.length ? () => setSkipped([]) : onTasks}
+              >
+                {skipped.length ? "Ver opciones de nuevo" : "Ver tareas"}
+              </button>
+            </>
+          )}
+        </article>
+        <aside className="next-event" aria-label="Próximo evento">
+          <p className="eyebrow">
+            {event && instant(event.startAt) <= now ? "Evento en curso" : "Próximo compromiso"}
+          </p>
+          {event ? (
+            <>
+              <p className="text-xl font-medium mt-3">{event.title}</p>
+              <p className="text-sm mt-2">
+                {localDate(instant(event.startAt)).equals(today)
+                  ? "Hoy"
+                  : localDate(instant(event.startAt)).toLocaleString("es-CL", {
+                      weekday: "long",
+                      day: "numeric",
+                      month: "short",
+                    })}{" "}
+                · {formatTime(event.startAt)}–{formatTime(event.endAt)}
+              </p>
+              {event.location && <p className="text-sm text-muted mt-1">{event.location}</p>}
+            </>
+          ) : (
+            <p className="text-sm text-muted mt-3">Sin compromisos próximos.</p>
+          )}
+          <button className="text-button mt-4" onClick={onCalendar}>
+            Ver calendario →
+          </button>
+          {plan.attention.length > 0 && (
+            <aside className="space-y-2 mt-5" aria-label="Entregas que requieren atención">
+              <h2 className="text-sm font-medium">Entregas que requieren atención</h2>
+              {plan.attention.slice(0, 2).map((item) => (
+                <p key={item.task.id} className="text-sm text-muted">
+                  <span
+                    className="project-dot"
+                    style={{ background: projectColor(workspace, item.task.projectId) }}
+                  />
+                  {item.task.title} · {deadlineHint(workspace, item.task.id, now)}
+                  {item.task.status === "blocked" ? " · bloqueada" : ""}
+                </p>
+              ))}
+              {plan.attention.length > 2 && (
+                <button className="text-button" onClick={onTasks}>
+                  Ver las {plan.attention.length} tareas en riesgo
+                </button>
+              )}
+            </aside>
+          )}
         </aside>
-      )}
+      </div>
       <PlanningWarnings workspace={workspace} />
       <AgendaDay
         workspace={workspace}
-        date={localDate(now).toString()}
+        date={today.toString()}
         now={now}
         busy={actions.busy}
         onLock={onLock}
+        remainingOnly
+        actions={actions}
       />
-      <button className="button" onClick={onCalendar}>
-        Open Calendar / Availability
-      </button>
-      {plan.active && (
-        <article className="panel space-y-4" aria-label="Active task">
-          <p className="text-xs font-medium tracking-widest text-accent uppercase">In progress</p>
-          <h2 className="text-xl font-medium">{plan.active.task.title}</h2>
-          <p className="text-sm text-muted">
-            This session: {formatMinutes(entryMinutes(plan.active.entry, now))} · Previously
-            recorded: {formatMinutes(plan.active.task.actualMinutes)}
-          </p>
-          <p className="text-xs text-muted">
-            Time continues across app restarts until you stop or complete this task.
-          </p>
-          <div className="flex gap-3">
-            <button
-              className="button"
-              disabled={actions.busy}
-              onClick={() => actions.onStop(plan.active!.task.id)}
-            >
-              Stop
-            </button>
-            <button
-              className="button-primary"
-              disabled={actions.busy}
-              onClick={() => actions.onComplete(plan.active!.task.id)}
-            >
-              Complete task
-            </button>
-          </div>
-        </article>
-      )}
-      <article className="panel space-y-4" aria-label="Next Task">
-        <p className="text-xs font-medium tracking-widest text-accent uppercase">Next Task</p>
-        {next ? (
-          <>
-            <h2 className="text-xl font-medium">{next.task.title}</h2>
-            <p className="text-sm text-muted">
-              {workspace.projects.find((p) => p.id === next.task.projectId)?.name ?? "No project"} ·{" "}
-              {formatMinutes(next.remainingMinutes)} remaining
-              {next.task.estimatedMinutes === null ? " (assumed)" : ""}
-            </p>
-            <p className="text-sm text-muted">
-              {formatDeadline(next.task.deadline)} · {next.risk} risk
-            </p>
-            <p className="text-sm leading-6 text-muted">{next.reason}</p>
-            {scheduled?.id === next.task.id && (
-              <p className="text-sm text-muted">
-                Next task in the proposed schedule. Check its work-block time in Calendar.
-              </p>
-            )}
-            <button
-              className="button-primary"
-              disabled={actions.busy}
-              onClick={() => actions.onStart(next.task.id)}
-            >
-              Start task
-            </button>
-          </>
-        ) : (
-          <p className="text-sm text-muted">
-            {plan.active
-              ? "Finish or stop the active task to choose what comes next."
-              : "No available task. Create a task, unblock one, or activate its project."}
-          </p>
-        )}
-        <div className="flex gap-3">
-          <button className="button" disabled={actions.busy} onClick={onReplan}>
-            Plan / Replan
-          </button>
-          <button className="button" onClick={onTasks}>
-            View tasks
-          </button>
-        </div>
-      </article>
-      <p className="text-xs text-muted">
-        Scheduling uses configured availability and fixed events. Work blocks are proposals;
-        recorded time remains the measure of completed work.
-      </p>
     </section>
   );
 }

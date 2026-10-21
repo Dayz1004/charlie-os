@@ -46,6 +46,7 @@ function rule(weekday = 2, startLocal = "09:00", endLocal = "17:00", enabled = t
 }
 function data(tasks: Task[], changes: Partial<Workspace> = {}): Workspace {
   return {
+    preferences: { theme: "system", horizonDays: 42 },
     tasks,
     projects: [],
     dependencies: [],
@@ -223,6 +224,7 @@ describe("deterministic scheduling", () => {
           {
             id: "p",
             name: "p",
+            color: "#6d8c80",
             description: null,
             status: "paused",
             createdAt: iso(NOW),

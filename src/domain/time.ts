@@ -36,24 +36,28 @@ export function entryMinutes(entry: TimeEntry, now: number): number {
 }
 
 export function formatDeadline(deadline: Deadline | null): string {
-  if (!deadline) return "No deadline";
+  if (!deadline) return "Sin fecha límite";
   if (deadline.kind === "date") {
     const date = Temporal.PlainDate.from(deadline.value);
-    return `${date.toLocaleString("en-GB", { dateStyle: "medium" })} · all day`;
+    return `${date.toLocaleString("es-CL", { day: "numeric", month: "short", year: "numeric" })} · todo el día`;
   }
-  return new Intl.DateTimeFormat("en-GB", {
+  return new Intl.DateTimeFormat("es-CL", {
     dateStyle: "medium",
     timeStyle: "short",
+    hourCycle: "h23",
     timeZone: TIME_ZONE,
   }).format(Temporal.Instant.from(deadline.value).epochMilliseconds);
 }
 
 export function formatMinutes(minutes: number): string {
   if (minutes > 0 && minutes < 1) return "<1 min";
-  return `${Math.round(minutes)} min`;
+  const rounded = Math.max(0, Math.round(minutes));
+  const hours = Math.floor(rounded / 60);
+  const rest = rounded % 60;
+  return hours ? `${hours} h${rest ? ` ${rest} min` : ""}` : `${rest} min`;
 }
 
 export function dayGreeting(now: number): string {
   const hour = Temporal.Instant.fromEpochMilliseconds(now).toZonedDateTimeISO(TIME_ZONE).hour;
-  return hour < 12 ? "Good morning." : hour < 19 ? "Good afternoon." : "Good evening.";
+  return hour < 12 ? "Buenos días." : hour < 19 ? "Buenas tardes." : "Buenas noches.";
 }

@@ -1,31 +1,40 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Temporal } from "@js-temporal/polyfill";
 import type { AvailabilityInput, CalendarEvent, EventInput, Workspace } from "../../domain/models";
-import { instant, localDate } from "../../domain/intervals";
-import { dayLoad, HORIZON_DAYS } from "../../domain/scheduling";
-import { assessTask } from "../../domain/priority";
-import { formatDeadline, formatMinutes, TIME_ZONE } from "../../domain/time";
-import { AgendaDay } from "./AgendaDay";
-import { AvailabilityForm } from "./AvailabilityForm";
-import { EventForm } from "./EventForm";
+import { localDate, instant } from "../../domain/intervals";
+import { formatDeadline } from "../../domain/time";
+import { projectColor } from "../../presentation/workspace";
+import type { TaskActions } from "../tasks/TasksView";
 import { PlanningWarnings } from "./PlanningWarnings";
+import { AgendaDay } from "./AgendaDay";
+import { EventForm } from "./EventForm";
+import { AvailabilityForm } from "./AvailabilityForm";
+import { WeekTimeline } from "./WeekTimeline";
+import { MonthOverview } from "./MonthOverview";
 
+type Mode = "week" | "month" | "events" | "availability";
 interface Props {
   workspace: Workspace;
   now: number;
   busy: boolean;
+  actions: TaskActions;
   onReplan(): void;
   onLock(id: string, locked: boolean): void;
   onSaveEvent(input: EventInput, id?: string): Promise<boolean>;
   onDeleteEvent(id: string): Promise<boolean>;
   onSaveAvailability(input: AvailabilityInput[]): Promise<boolean>;
 }
-type Mode = "week" | "month" | "events" | "availability";
-
+const modeLabels = {
+  week: "Semana",
+  month: "Mes",
+  events: "Eventos",
+  availability: "Disponibilidad",
+};
 export function CalendarView({
   workspace,
   now,
   busy,
+  actions,
   onReplan,
   onLock,
   onSaveEvent,
@@ -37,9 +46,16 @@ export function CalendarView({
   const [editing, setEditing] = useState<CalendarEvent | "new" | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [showPast, setShowPast] = useState(false);
+  const agendaRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (selected) agendaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [selected]);
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [mode]);
   const date = Temporal.PlainDate.from(anchor);
   const monday = date.subtract({ days: date.dayOfWeek - 1 });
-  const monthStart = date.with({ day: 1 });
   const editEvent = (id: string) => {
     setEditing(workspace.events.find((e) => e.id === id) ?? null);
     setMode("events");
@@ -47,151 +63,137 @@ export function CalendarView({
   function move(direction: number) {
     setAnchor(
       (mode === "month"
-        ? monthStart.add({ months: direction })
+        ? date.with({ day: 1 }).add({ months: direction })
         : date.add({ days: 7 * direction })
       ).toString(),
     );
     setSelected(null);
   }
   return (
-    <section className="space-y-6" aria-labelledby="calendar-heading">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 id="calendar-heading" className="text-3xl font-semibold">
-          Calendar
-        </h1>
-        <button className="button-primary" disabled={busy} onClick={onReplan}>
-          Plan / Replan
-        </button>
-      </div>
-      <p className="text-sm text-muted">
-        {TIME_ZONE} · Plans cover the next {HORIZON_DAYS} local days. Tasks keep their estimates and
-        deadlines.
-      </p>
-      <div className="flex flex-wrap gap-2" aria-label="Calendar views">
-        {(["week", "month", "events", "availability"] as const).map((m) => (
+    <section className="space-y-5" aria-labelledby="calendar-heading">
+      <div className="view-header">
+        <div>
+          <p className="eyebrow">Un lugar para cada cosa</p>
+          <h1 id="calendar-heading">Calendario</h1>
+        </div>
+        <div className="flex gap-2">
           <button
-            className={m === mode ? "button-primary" : "button"}
-            key={m}
-            aria-pressed={m === mode}
-            onClick={() => setMode(m)}
+            className="button"
+            disabled={busy}
+            onClick={() => {
+              setMode("events");
+              setEditing("new");
+            }}
           >
-            {m[0].toUpperCase() + m.slice(1)}
+            + Evento
+          </button>
+          <button className="button-primary" disabled={busy} onClick={onReplan}>
+            {workspace.planningState ? "Replanificar" : "Planificar"}
+          </button>
+        </div>
+      </div>
+      <div className="tabs" aria-label="Vistas del calendario">
+        {(["week", "month", "events", "availability"] as const).map((m) => (
+          <button key={m} aria-pressed={m === mode} onClick={() => setMode(m)}>
+            {modeLabels[m]}
           </button>
         ))}
       </div>
-      <PlanningWarnings workspace={workspace} />
+      <PlanningWarnings workspace={workspace} compact />
       {(mode === "week" || mode === "month") && (
         <>
-          <div className="flex flex-wrap items-center gap-3">
-            <button className="button" onClick={() => move(-1)}>
-              Previous {mode}
-            </button>
-            <h2 className="font-medium">
+          <div className="calendar-toolbar">
+            <h2>
               {mode === "week"
-                ? `Week of ${monday.toString()}`
-                : monthStart.toLocaleString("en-GB", { month: "long", year: "numeric" })}
+                ? `${monday.toLocaleString("es-CL", { day: "numeric", month: "short" })} – ${monday.add({ days: 6 }).toLocaleString("es-CL", { day: "numeric", month: "short", year: "numeric" })}`
+                : date.toLocaleString("es-CL", { month: "long", year: "numeric" })}
             </h2>
-            <button className="button" onClick={() => move(1)}>
-              Next {mode}
-            </button>
-            <button
-              className="button"
-              onClick={() => {
-                setAnchor(localDate(now).toString());
-                setSelected(null);
-              }}
-            >
-              Current {mode}
-            </button>
+            <div className="flex gap-2">
+              <button
+                className="button-small"
+                aria-label={mode === "week" ? "Semana anterior" : "Mes anterior"}
+                onClick={() => move(-1)}
+              >
+                ←
+              </button>
+              <button
+                className="button-small"
+                onClick={() => {
+                  setAnchor(localDate(now).toString());
+                  setSelected(null);
+                }}
+              >
+                Hoy
+              </button>
+              <button
+                className="button-small"
+                aria-label={mode === "week" ? "Semana siguiente" : "Mes siguiente"}
+                onClick={() => move(1)}
+              >
+                →
+              </button>
+            </div>
           </div>
           {mode === "week" ? (
-            <div className="grid gap-4 lg:grid-cols-2">
-              {Array.from({ length: 7 }, (_, i) => (
-                <AgendaDay
-                  key={i}
-                  workspace={workspace}
-                  date={monday.add({ days: i }).toString()}
-                  now={now}
-                  busy={busy}
-                  onLock={onLock}
-                  onEditEvent={editEvent}
-                />
-              ))}
-            </div>
+            <>
+              <div className="calendar-legend">
+                <span>▧ Evento fijo</span>
+                <span>▰ Trabajo propuesto</span>
+                <span>◆ Reservado</span>
+                <span className="ml-auto">Santiago</span>
+              </div>
+              <WeekTimeline
+                workspace={workspace}
+                monday={monday}
+                now={now}
+                onSelect={setSelected}
+              />
+              <p className="text-xs text-muted">
+                Selecciona un bloque o un día para ver sus acciones. Los bloques reservados se
+                conservan al replanificar.
+              </p>
+            </>
           ) : (
             <>
-              <div className="grid grid-cols-7 gap-2" aria-label="Month overview">
-                {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-                  <p key={d} className="text-center text-xs text-muted">
-                    {d}
-                  </p>
-                ))}
-                {Array.from({ length: monthStart.dayOfWeek - 1 }, (_, i) => (
-                  <div key={`empty-${i}`} />
-                ))}
-                {Array.from({ length: date.daysInMonth }, (_, i) => {
-                  const d = monthStart.add({ days: i });
-                  const key = d.toString();
-                  const load = dayLoad(workspace, d);
-                  const tasks = workspace.tasks.filter(
-                    (t) =>
-                      t.status !== "done" &&
-                      t.status !== "cancelled" &&
-                      t.deadline &&
-                      (t.deadline.kind === "date"
-                        ? t.deadline.value === key
-                        : localDate(instant(t.deadline.value)).toString() === key),
-                  );
-                  const risk = tasks.some((t) =>
-                    ["high", "critical"].includes(assessTask(t, now).risk),
-                  );
-                  const shortfall = workspace.planningState?.warnings.some(
-                    (w) =>
-                      w.at &&
-                      localDate(instant(w.at) - 1).toString() === key &&
-                      ["deadline_capacity", "unscheduled_work", "horizon_capacity"].includes(
-                        w.code,
-                      ),
-                  );
-                  return (
-                    <button
-                      className="rounded-lg border border-line bg-surface p-2 text-left"
-                      key={key}
-                      aria-label={`Open day ${key}`}
-                      onClick={() => setSelected(key)}
-                    >
-                      <span className="text-sm font-medium">{i + 1}</span>
-                      <p className="text-xs text-muted">
-                        {Math.round(load.plannedMinutes)} / {Math.round(load.capacityMinutes)} min
-                      </p>
-                      {tasks.length > 0 && <p className="text-xs">{tasks.length} due</p>}
-                      {(risk || shortfall || load.plannedMinutes > load.capacityMinutes) && (
-                        <p className="text-xs">Risk / shortfall</p>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+              <MonthOverview
+                workspace={workspace}
+                month={date}
+                now={now}
+                selected={selected}
+                onSelect={setSelected}
+              />
               <p className="text-xs text-muted">
-                Planned minutes / capacity after fixed events. Select a day for its agenda.
+                La barra muestra trabajo planificado respecto a tu capacidad. ! indica riesgo o
+                sobrecarga. Selecciona un día para ver su agenda.
               </p>
-              {selected && (
-                <AgendaDay
-                  workspace={workspace}
-                  date={selected}
-                  now={now}
-                  busy={busy}
-                  onLock={onLock}
-                  onEditEvent={editEvent}
-                />
-              )}
             </>
+          )}
+          {selected && (
+            <div ref={agendaRef} className="day-details">
+              <button
+                className="text-button mb-3"
+                onClick={() => {
+                  setSelected(null);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+              >
+                ← Volver al calendario
+              </button>
+              <AgendaDay
+                workspace={workspace}
+                date={selected}
+                now={now}
+                busy={busy}
+                onLock={onLock}
+                onEditEvent={editEvent}
+                actions={actions}
+              />
+            </div>
           )}
         </>
       )}
       {mode === "availability" && (
         <AvailabilityForm
-          key="availability"
           availability={workspace.availability}
           busy={busy}
           onSave={onSaveAvailability}
@@ -199,9 +201,6 @@ export function CalendarView({
       )}
       {mode === "events" && (
         <div className="space-y-4">
-          <button className="button-primary" disabled={busy} onClick={() => setEditing("new")}>
-            Create event
-          </button>
           {editing && (
             <EventForm
               key={editing === "new" ? "new" : editing.id}
@@ -213,57 +212,71 @@ export function CalendarView({
               onCancel={() => setEditing(null)}
             />
           )}
-          {workspace.events.length === 0 && (
-            <p className="panel text-muted">No local events yet.</p>
+          <div className="flex items-center justify-between">
+            <h2 className="font-medium">Tus compromisos</h2>
+            <label className="text-sm text-muted">
+              <input
+                type="checkbox"
+                checked={showPast}
+                onChange={(e) => setShowPast(e.target.checked)}
+              />{" "}
+              Incluir pasados
+            </label>
+          </div>
+          {workspace.events.filter((e) => showPast || instant(e.endAt) > now).length === 0 && (
+            <p className="empty-state">Sin eventos próximos. Agrega un compromiso con + Evento.</p>
           )}
-          {workspace.events.map((e) => (
-            <article key={e.id} className="panel space-y-3">
-              <h2 className="font-medium">{e.title}</h2>
-              <p className="text-sm text-muted">
-                {formatDeadline({ kind: "instant", value: e.startAt })} →{" "}
-                {formatDeadline({ kind: "instant", value: e.endAt })}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <button className="button" disabled={busy} onClick={() => setEditing(e)}>
-                  Edit event
-                </button>
-                {deleting === e.id ? (
-                  <>
-                    <button
-                      className="button"
-                      disabled={busy}
-                      onClick={() => {
-                        void onDeleteEvent(e.id).then((ok) => {
-                          if (ok) setDeleting(null);
-                        });
-                      }}
-                    >
-                      Confirm delete event
+          {[...workspace.events]
+            .filter((e) => showPast || instant(e.endAt) > now)
+            .sort((a, b) => instant(a.startAt) - instant(b.startAt))
+            .map((e) => (
+              <article
+                key={e.id}
+                className="task-row"
+                style={{ borderLeftColor: projectColor(workspace, e.projectId) }}
+              >
+                <div className="flex flex-wrap justify-between gap-3">
+                  <div>
+                    <h2 className="font-medium">{e.title}</h2>
+                    <p className="text-sm text-muted mt-1">
+                      {formatDeadline({ kind: "instant", value: e.startAt })} →{" "}
+                      {formatDeadline({ kind: "instant", value: e.endAt })}
+                    </p>
+                    {e.location && <p className="text-xs text-muted mt-1">{e.location}</p>}
+                  </div>
+                  <div className="flex gap-2 items-start">
+                    <button className="button-small" disabled={busy} onClick={() => setEditing(e)}>
+                      Editar
                     </button>
-                    <button className="button" onClick={() => setDeleting(null)}>
-                      Keep event
-                    </button>
-                  </>
-                ) : (
-                  <button className="button" disabled={busy} onClick={() => setDeleting(e.id)}>
-                    Delete event
-                  </button>
-                )}
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
-      {mode === "month" && (
-        <div className="panel space-y-2">
-          <h2 className="font-medium">Open task deadlines</h2>
-          {workspace.tasks
-            .filter((t) => t.status !== "done" && t.status !== "cancelled" && t.deadline)
-            .map((t) => (
-              <p key={t.id} className="text-sm text-muted">
-                {t.title} · {formatDeadline(t.deadline)} · {assessTask(t, now).risk} risk ·{" "}
-                {formatMinutes(t.estimatedMinutes ?? 30)} estimated
-              </p>
+                    {deleting === e.id ? (
+                      <>
+                        <button
+                          className="button-small"
+                          disabled={busy}
+                          onClick={() => {
+                            void onDeleteEvent(e.id).then((ok) => {
+                              if (ok) setDeleting(null);
+                            });
+                          }}
+                        >
+                          Confirmar eliminación
+                        </button>
+                        <button className="button-small" onClick={() => setDeleting(null)}>
+                          Conservar
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        className="button-small"
+                        disabled={busy}
+                        onClick={() => setDeleting(e.id)}
+                      >
+                        Eliminar
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </article>
             ))}
         </div>
       )}

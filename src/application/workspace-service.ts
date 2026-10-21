@@ -2,6 +2,7 @@ import type {
   AvailabilityInput,
   EventInput,
   ProjectInput,
+  Preferences,
   ScheduleInput,
   TaskInput,
   Workspace,
@@ -10,6 +11,7 @@ import { generateSchedule } from "../domain/scheduling";
 import { systemClock, type Clock } from "../domain/time";
 
 export interface WorkspaceRepository {
+  savePreferences(input: Preferences): Promise<Workspace>;
   read(): Promise<Workspace>;
   createTask(input: TaskInput): Promise<Workspace>;
   updateTask(id: string, input: TaskInput): Promise<Workspace>;
@@ -32,6 +34,9 @@ export class WorkspaceService {
   constructor(readonly repository: WorkspaceRepository) {}
   load() {
     return this.repository.read();
+  }
+  savePreferences(input: Preferences) {
+    return this.repository.savePreferences(input);
   }
   saveTask(input: TaskInput, id?: string) {
     return id ? this.repository.updateTask(id, input) : this.repository.createTask(input);
@@ -62,7 +67,7 @@ export class WorkspaceService {
   }
   async replan(clock: Clock = systemClock) {
     const workspace = await this.repository.read();
-    const schedule = generateSchedule(workspace, clock);
+    const schedule = generateSchedule(workspace, clock, workspace.preferences.horizonDays);
     return this.repository.replaceSchedule(schedule);
   }
 }

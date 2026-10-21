@@ -2,9 +2,9 @@
 
 A local-first personal workspace for tasks, projects, and time. `PROJECT_SPEC.md` defines the product; `AGENTS.md` contains contributor guidelines.
 
-Milestone 2 adds local Events, weekly Availability, deterministic work scheduling, and Calendar views to the task/time vertical slice. Today, Tasks, basic Projects, and Calendar are functional. Inbox and Settings remain unavailable. No AI, OAuth, or external integrations are connected.
+Milestone 3 makes the local task/time and scheduling workflows ready for daily use: Spanish navigation, a daily command center, a visual weekly timeline, a compact month overview, quick task entry, project colors, clear availability, and persisted appearance/planning settings. No AI, OAuth, or external integrations are connected.
 
-In Calendar, save enabled availability windows and fixed events, then select **Plan / Replan**. The scheduler proposes work across the next 42 Santiago days, preserves past/ongoing and locked future blocks, and reports insufficient capacity. Tasks keep their estimates and deadlines; proposed work does not count as recorded time. Use Week or Month to inspect the plan and lock future blocks. Replanning is an explicit action.
+In Calendar, save enabled availability windows and fixed events, then select **Plan / Replan**. The scheduler proposes work across the next 42 Santiago days by default (adjustable to 1–90 in Ajustes), preserves past/ongoing and locked future blocks, and reports insufficient capacity. Tasks keep their estimates and deadlines; proposed work does not count as recorded time. Use Week or Month to inspect the plan and lock future blocks. Replanning is an explicit action.
 
 ## Development
 
@@ -51,7 +51,7 @@ $env:CHARLIE_SEED = '1'
 pnpm tauri dev
 ```
 
-The seed adds one fictitious task only when the task table is empty. Both environment options are ignored in release builds. Omit `CHARLIE_SEED` for a blank database. Never commit personal databases, credentials, `.env` files, or validation artifacts.
+The opt-in seed adds three fictitious projects, six tasks, two fixed events, enabled weekday availability, and disabled weekend windows only when the task/project/event/availability tables are all empty. Use Planificar in the app to generate work and an overload warning. Both environment options are ignored in release builds. Omit `CHARLIE_SEED` for a blank database. Never commit personal databases, credentials, `.env` files, or validation artifacts.
 
 ## Boundaries
 
@@ -59,7 +59,8 @@ The seed adds one fictitious task only when the task table is empty. Both enviro
 - `src/application/`: repository interface and frontend use cases.
 - `src/adapters/`: typed Tauri command/DTO bridge. Keep its contract aligned with Rust `commands.rs` and `domain.rs`.
 - `src/app/`: shell, composition, navigation, and transient state projected from backend snapshots.
-- `src/features/`: Today, Tasks, Projects, and Calendar views.
+- `src/features/`: Today, Tasks, Projects, Calendar, and Settings views.
+- `src/presentation/`: pure Spanish summaries, calendar geometry, and capacity display helpers.
 - `src/styles/`: semantic tokens and Tailwind styles; system light/dark mode supported.
 - `src-tauri/src/domain.rs`: DTOs, validation, injectable backend clock, and elapsed-time rules.
 - `src-tauri/src/application.rs`: use cases, identity creation, clock injection.
@@ -71,6 +72,8 @@ The seed adds one fictitious task only when the task table is empty. Both enviro
 
 [Milestone 2 decisions and validation](docs/MILESTONE_2.md) specify the scheduling algorithm, overload detection, migration, DST semantics, and completed desktop restart scenario.
 
+[Milestone 3 decisions and validation](docs/MILESTONE_3.md) describe the daily UX, additive migration, settings, and native walkthrough.
+
 ## Added dependencies
 
-`@tauri-apps/api` supplies the IPC bridge. `@js-temporal/polyfill` provides timezone-aware calendar-date and local-time conversion, including Chilean DST. `vitest` runs frontend domain tests. Rust uses bundled `rusqlite` for offline SQLite, `serde`/`serde_json` for typed DTOs and saved warnings, `chrono`/`chrono-tz` for timestamps and Santiago availability validation, and `uuid` for stable identities. `tempfile` supports integration tests. No calendar library or new frontend dependency was added in Milestone 2. React state remains sufficient.
+`@tauri-apps/api` supplies the IPC bridge. `@js-temporal/polyfill` provides timezone-aware calendar-date and local-time conversion, including Chilean DST. `vitest` runs frontend domain tests. Rust uses bundled `rusqlite` for offline SQLite, `serde`/`serde_json` for typed DTOs and saved warnings, `chrono`/`chrono-tz` for timestamps and Santiago availability validation, and `uuid` for stable identities. `tempfile` supports integration tests. No calendar library or new frontend dependency was added in Milestones 2–3. React state remains sufficient.
