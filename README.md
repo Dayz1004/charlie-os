@@ -1,79 +1,89 @@
 # CHARLIE OS
 
-A local-first personal workspace for tasks, projects, and time. `PROJECT_SPEC.md` defines the product; `AGENTS.md` contains contributor guidelines.
+A local-first desktop productivity system that turns tasks, deadlines, estimates, availability, and fixed commitments into an executable schedule.
 
-Milestone 3 makes the local task/time and scheduling workflows ready for daily use: Spanish navigation, a daily command center, a visual weekly timeline, a compact month overview, quick task entry, project colors, clear availability, and persisted appearance/planning settings. No AI, OAuth, or external integrations are connected.
+![Today with a generated plan using fictitious data](docs/assets/today.png)
 
-In Calendar, save enabled availability windows and fixed events, then select **Plan / Replan**. The scheduler proposes work across the next 42 Santiago days by default (adjustable to 1–90 in Ajustes), preserves past/ongoing and locked future blocks, and reports insufficient capacity. Tasks keep their estimates and deadlines; proposed work does not count as recorded time. Use Week or Month to inspect the plan and lock future blocks. Replanning is an explicit action.
+## Why I built it
 
-## Development
+A task list tells you what is pending; a calendar tells you when you are busy. CHARLIE brings those two views together to answer **“What should I work on now?”** and make an overloaded day visible before it becomes a missed deadline.
 
-Use Node.js 22.18+ (or a supported newer LTS), pnpm 11.19.0, stable Rust with the `x86_64-pc-windows-msvc` host, Microsoft C++ Build Tools, a Windows SDK, and WebView2.
+## Current capabilities
+
+- **Tasks and projects:** quick task capture, deadlines, estimates, priorities, status filters, and project colors.
+- **Time tracking:** start, stop, and complete tasks, with one active timer and persistent recorded work.
+- **Planning:** weekly availability, fixed local events, deterministic scheduling and replanning, split work blocks, locked reservations, and capacity/overload warnings.
+- **Daily workspace:** Today command center, visual Week timeline, and Month overview with deadlines and workload.
+- **Local persistence:** SQLite storage, versioned migrations, and saved appearance/planning preferences. Spanish desktop UX with Santiago time handling.
+
+## How scheduling works
+
+On **Planificar / Replanificar**, the engine:
+
+1. Expands weekly availability into Santiago dates, then subtracts fixed events and preserved reservations.
+2. Orders eligible tasks by deadline, then priority/risk and stable tie-breakers. Blocked tasks and unfinished prerequisites prevent scheduling; undated tasks remain eligible.
+3. Fits remaining work into the earliest available intervals as `PlanBlock`s of up to 90 minutes, respecting splitting and minimum-block rules.
+4. Preserves past, ongoing, and locked future blocks; replaces only unlocked future work; reports conflicts and work that cannot fit.
+
+The default horizon is 42 days, configurable from 1–90. This is a deterministic greedy heuristic, not a global optimizer. Missing estimates use a disclosed 30-minute assumption. Proposed blocks never count as completed work, and the planner never changes estimates or deadlines to make a plan fit. [Algorithm and edge cases](docs/MILESTONE_2.md).
+
+## Architecture and engineering decisions
+
+```text
+React views → application services → typed Tauri IPC → Rust services → SQLite
+                     ↓
+          pure TypeScript planning engine
+```
+
+- **SQLite is authoritative.** React displays replaceable snapshots. Rust validates writes and commits state changes transactionally.
+- **Planning is reproducible.** Domain code has no React or persistence dependency and accepts an explicit clock.
+- **Concurrent changes are checked.** Workspace revisions reject stale schedule writes; database constraints enforce a single active timer.
+- **Time has explicit semantics.** UTC instants, local dates, and date-only deadlines are distinct. Availability accounts for Santiago DST gaps and repeated hours.
+
+### Where AI fits
+
+**No LLM or external integration is connected today.** CHARLIE intentionally separates deterministic planning and structured persistent state from future AI functionality. Future AI could interpret natural language, surface context, explain choices, and propose actions; domain code would enforce scheduling and state invariants while SQLite remains the source of truth.
+
+This separation makes proposals inspectable and testable, keeps the core workflow usable offline, and allows a future model provider to change without replacing the scheduling or persistence rules.
+
+## Tech stack
+
+Tauri 2 · React 19 · TypeScript · Rust · SQLite (`rusqlite`) · Vite · Tailwind CSS · Temporal · Vitest
+
+## Screenshots
+
+Real desktop captures using fictitious demo data. Today appears above; Week shows proposed work around fixed events, and Month summarizes deadlines and planned workload. See the [capture guide](docs/assets/README.md) to reproduce the demo.
+
+![Week: proposed work around fixed events](docs/assets/week.png)
+
+![Month: deadlines and planned workload](docs/assets/month.png)
+
+## Running locally
+
+Windows development prerequisites: Node.js 22.18+ within the range in `package.json`, pnpm 11.19.0, stable Rust with the MSVC toolchain, Microsoft C++ Build Tools, a Windows SDK, and WebView2.
 
 ```powershell
 pnpm install --frozen-lockfile
 pnpm tauri dev
 ```
 
-Tauri starts Vite at `http://localhost:1420` and opens the native window. Task operations require the desktop backend; the browser alone has no alternate task store. Port 1420 must be available. Close the window and stop the terminal with Ctrl+C when finished.
+The desktop backend is required; a browser-only Vite session cannot load or persist tasks. No API keys or account are required. For an isolated demo, use the [fictitious seed instructions](docs/assets/README.md). See the [development guide](docs/DEVELOPMENT.md) for database location, timer behavior, packaging, and the full validation commands.
 
-## Validation
+## Tests and quality
+
+The current suite contains 60 TypeScript tests and 27 Rust integration tests (87 total).
+
+Vitest covers deterministic scheduling, deadlines, splitting, capacity, protected blocks, and Santiago DST. Rust integration tests use temporary databases to cover migrations, persistence, timer exclusivity, validation, and stale writes across connections.
 
 ```powershell
-pnpm build
-pnpm lint
-pnpm format:check
 pnpm test
-cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 cargo test --locked --manifest-path src-tauri/Cargo.toml
-cargo check --locked --manifest-path src-tauri/Cargo.toml
-cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
-pnpm tauri dev
 ```
 
-`pnpm typecheck` can be run separately. `pnpm tauri build` packages the app. `pnpm format` formats frontend files and documentation; use `cargo fmt` for Rust. Vitest covers deterministic planning, risk, and Santiago dates; Rust integration tests use temporary SQLite databases for migrations, persistence, state transitions, and timer invariants.
+Type checking, production build, linting, formatting, Cargo check, and Clippy complement these tests. The [daily UX verification record](docs/MILESTONE_3.md#native-desktop-verification-and-remaining-checks) records completed manual checks on the new PC for quick task creation, task and theme persistence, reduced-window usability, and native app restart, alongside the scope of other verification.
 
-## Data and time
+## Roadmap
 
-The database is `charlie.sqlite3` under Tauri's application local-data directory (`%LOCALAPPDATA%\dev.charlie.os` on Windows). SQLite is the authoritative store. There is no localStorage fallback or automatic seed in production. Numbered migrations run transactionally on startup and never reset existing data. Task work totals are derived from closed time entries.
+Future work, **not implemented**: natural-language task capture, AI-assisted reasoning and explanations, Google Calendar, Gmail, Drive, and progressively automated ingestion with user review.
 
-Date-only deadlines keep their `YYYY-MM-DD` value and expire at the start of the next Santiago day. Timed deadlines and lifecycle timestamps are absolute UTC RFC3339 values. The UI displays and interprets times in `America/Santiago`, including daylight-saving transitions. Ambiguous/nonexistent local time inputs are rejected.
-
-An open timer continues across app restarts, including time spent with the app closed. Stop records the elapsed milliseconds and returns the task to `todo`; Complete records elapsed time and marks it `done`. Stop or complete the current task before starting another. A backward clock change produces an error when closing a timer rather than recording negative work.
-
-## Isolated development data
-
-Debug builds support an optional database override and seed:
-
-```powershell
-$env:CHARLIE_DB_PATH = 'C:\dev\charlie-os\.validation\demo.sqlite3'
-$env:CHARLIE_SEED = '1'
-pnpm tauri dev
-```
-
-The opt-in seed adds three fictitious projects, six tasks, two fixed events, enabled weekday availability, and disabled weekend windows only when the task/project/event/availability tables are all empty. Use Planificar in the app to generate work and an overload warning. Both environment options are ignored in release builds. Omit `CHARLIE_SEED` for a blank database. Never commit personal databases, credentials, `.env` files, or validation artifacts.
-
-## Boundaries
-
-- `src/domain/`: models, clock/date calculations, pure priority and planning functions; no React, Tauri, or database imports.
-- `src/application/`: repository interface and frontend use cases.
-- `src/adapters/`: typed Tauri command/DTO bridge. Keep its contract aligned with Rust `commands.rs` and `domain.rs`.
-- `src/app/`: shell, composition, navigation, and transient state projected from backend snapshots.
-- `src/features/`: Today, Tasks, Projects, Calendar, and Settings views.
-- `src/presentation/`: pure Spanish summaries, calendar geometry, and capacity display helpers.
-- `src/styles/`: semantic tokens and Tailwind styles; system light/dark mode supported.
-- `src-tauri/src/domain.rs`: DTOs, validation, injectable backend clock, and elapsed-time rules.
-- `src-tauri/src/application.rs`: use cases, identity creation, clock injection.
-- `src-tauri/src/repository.rs`, `schedule_repository.rs`: SQLite queries and atomic persistence transitions, including calendar data and schedule validation.
-- `src-tauri/src/database.rs`, `src-tauri/migrations/`: connection setup and immutable versioned migrations.
-- `src-tauri/tests/`: persistence and migration integration tests.
-
-[Milestone 1 decisions and validation](docs/MILESTONE_1.md) describe the schema, heuristic, limits, and desktop smoke test.
-
-[Milestone 2 decisions and validation](docs/MILESTONE_2.md) specify the scheduling algorithm, overload detection, migration, DST semantics, and completed desktop restart scenario.
-
-[Milestone 3 decisions and validation](docs/MILESTONE_3.md) describe the daily UX, additive migration, settings, and native walkthrough.
-
-## Added dependencies
-
-`@tauri-apps/api` supplies the IPC bridge. `@js-temporal/polyfill` provides timezone-aware calendar-date and local-time conversion, including Chilean DST. `vitest` runs frontend domain tests. Rust uses bundled `rusqlite` for offline SQLite, `serde`/`serde_json` for typed DTOs and saved warnings, `chrono`/`chrono-tz` for timestamps and Santiago availability validation, and `uuid` for stable identities. `tempfile` supports integration tests. No calendar library or new frontend dependency was added in Milestones 2–3. React state remains sufficient.
+The [product specification](docs/PRODUCT_SPEC.md) records the longer-term direction. Engineering records document [task persistence](docs/MILESTONE_1.md), [scheduling](docs/MILESTONE_2.md), and [daily UX](docs/MILESTONE_3.md). Contributor guidance lives in [AGENTS.md](AGENTS.md).

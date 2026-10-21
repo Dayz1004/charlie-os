@@ -31,3 +31,16 @@ src-tauri/gen/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Local credentials, database journals, and test/editor output
+*.pem
+*.key
+*.p12
+*.pfx
+*.db-journal
+*.sqlite-journal
+*.sqlite3-journal
+coverage/
+*.swp
+*.swo
+*~
